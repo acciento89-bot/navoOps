@@ -72,8 +72,8 @@ struct StoreStatusService: Sendable {
 
         async let appleSucceeded = dispatchSafely(appleBridge, token: token)
         async let googleSucceeded = dispatchSafely(googleBridge, token: token)
-        let succeeded = await [appleSucceeded, googleSucceeded]
-        guard succeeded.contains(true) else { throw ServiceError.allBridgesUnavailable }
+        let (appleOK, googleOK) = await (appleSucceeded, googleSucceeded)
+        guard appleOK || googleOK else { throw ServiceError.allBridgesUnavailable }
     }
 
     private func fetch(_ bridge: Bridge, token: String) async throws -> StoreStatusFeed {
