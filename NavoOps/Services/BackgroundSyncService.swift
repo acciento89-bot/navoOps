@@ -35,8 +35,17 @@ final class BackgroundSyncService: @unchecked Sendable {
 
             let products = PortfolioStore().loadMerged(with: ProductCatalog.seed)
             let repositories = Array(Set(products.map(\.repository)))
-            let health = await GitHubService().fetchRepositoryHealth(repositories: repositories)
+
+            async let healthTask = GitHubService().fetchRepositoryHealth(repositories: repositories)
+            async let storeTask = try? StoreStatusService().fetchFeed()
+
+            let health = await healthTask
             await NotificationService.shared.processWorkflowHealth(health)
+
+            if let feed = await storeTask {
+                await NotificationService.shared.processStoreFeed(feed)
+            }
+
             task.setTaskCompleted(success: !Task.isCancelled)
         }
 

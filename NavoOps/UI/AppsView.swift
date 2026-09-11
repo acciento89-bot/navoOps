@@ -83,23 +83,52 @@ struct ProductDetailView: View {
 
     private var releaseSection: some View {
         Section(L10n.t("Release", "Release")) {
-            TextField(L10n.t("Version", "Version"), text: $product.version)
+            HStack {
+                Text(L10n.t("Live-Version", "Live version"))
+                Spacer()
+                Text(model.resolvedVersion(for: product))
+                    .font(.subheadline.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+            HStack {
+                Text(L10n.t("Live-Build", "Live build"))
+                Spacer()
+                Text(model.resolvedBuild(for: product))
+                    .font(.subheadline.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+
+            TextField(L10n.t("Lokale Version / Fallback", "Local version / fallback"), text: $product.version)
                 .textInputAutocapitalization(.never)
-            TextField(L10n.t("Build", "Build"), text: $product.build)
+            TextField(L10n.t("Lokaler Build / Fallback", "Local build / fallback"), text: $product.build)
                 .keyboardType(.numberPad)
 
             if product.supportsApple {
-                Picker("Apple", selection: $product.appleState) {
-                    ForEach(ProductApp.StoreState.allCases, id: \.self) { state in
-                        Text(state.localizedTitle).tag(state)
+                HStack {
+                    Text("Apple")
+                    Spacer()
+                    StoreStateBadge(label: model.storeSnapshot(for: product, provider: .apple) == nil ? L10n.t("Lokal", "Local") : "Live", state: model.resolvedAppleState(for: product))
+                }
+                if model.storeSnapshot(for: product, provider: .apple) == nil {
+                    Picker(L10n.t("Apple Fallback", "Apple fallback"), selection: $product.appleState) {
+                        ForEach(ProductApp.StoreState.allCases, id: \.self) { state in
+                            Text(state.localizedTitle).tag(state)
+                        }
                     }
                 }
             }
 
             if product.supportsGoogle {
-                Picker("Google", selection: $product.googleState) {
-                    ForEach(ProductApp.StoreState.allCases, id: \.self) { state in
-                        Text(state.localizedTitle).tag(state)
+                HStack {
+                    Text("Google Play")
+                    Spacer()
+                    StoreStateBadge(label: model.storeSnapshot(for: product, provider: .google) == nil ? L10n.t("Lokal", "Local") : "Live", state: model.resolvedGoogleState(for: product))
+                }
+                if model.storeSnapshot(for: product, provider: .google) == nil {
+                    Picker(L10n.t("Google Fallback", "Google fallback"), selection: $product.googleState) {
+                        ForEach(ProductApp.StoreState.allCases, id: \.self) { state in
+                            Text(state.localizedTitle).tag(state)
+                        }
                     }
                 }
             }
@@ -167,6 +196,10 @@ struct ProductDetailView: View {
                     }
                 }
 
+                if health.buildState == .failure, health.workflowURL != nil {
+                    WorkflowRerunButton(product: product)
+                }
+
                 if let urlString = health.workflowURL, let url = URL(string: urlString) {
                     Link(L10n.t("Letzten Workflow öffnen", "Open latest workflow"), destination: url)
                 }
@@ -195,6 +228,28 @@ struct ProductDetailView: View {
 
     private var storeSection: some View {
         Section(L10n.t("Store-Informationen", "Store Information")) {
+            if let apple = model.storeSnapshot(for: product, provider: .apple) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Label("App Store Connect · LIVE", systemImage: "apple.logo")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(NavoTheme.success)
+                    Text("\(apple.rawState) · v\(apple.version ?? "–") · Build \(apple.build ?? "–")")
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if let google = model.storeSnapshot(for: product, provider: .google) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Label("Google Play · LIVE", systemImage: "play.rectangle.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(NavoTheme.success)
+                    Text("\(google.rawState) · v\(google.version ?? "–") · Build \(google.build ?? "–")")
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             if product.supportsApple {
                 TextField("Apple Bundle ID", text: Binding(
                     get: { product.storeInfo.appleBundleID ?? "" },
@@ -233,6 +288,45 @@ struct ProductDetailView: View {
 
     private func checklistToggle(_ title: String, _ value: Binding<Bool>) -> some View {
         Toggle(title, isOn: value)
+    }
+}
+
+private struct WorkflowRerunButton: View {
+    @EnvironmentObject private var model: AppModel
+    let product: ProductApp
+    @State private var isRunning = false
+    @State private var errorMessage: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Button {
+                Task { await rerun() }
+            } label: {
+                if isRunning {
+                    HStack { ProgressView(); Text(L10n.t("Workflow wird neu gestartet …", "Restarting workflow …")) }
+                } else {
+                    Label(L10n.t("Fehlgeschlagene Jobs neu starten", "Rerun failed jobs"), systemImage: "arrow.clockwise.circle.fill")
+                }
+            }
+            .disabled(isRunning)
+
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundStyle(NavoTheme.danger)
+            }
+        }
+    }
+
+    private func rerun() async {
+        isRunning = true
+        errorMessage = nil
+        defer { isRunning = false }
+        do {
+            try await model.rerunFailedWorkflow(for: product)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 }
 

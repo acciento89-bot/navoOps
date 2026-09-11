@@ -19,10 +19,13 @@ struct DashboardView: View {
                         MetricCard(title: L10n.t("Produkte", "Products"), value: "\(model.products.count)", icon: "square.stack.3d.up.fill")
                         MetricCard(title: L10n.t("Komplett live", "Fully live"), value: "\(model.fullyLiveCount)", icon: "checkmark.seal.fill", tint: NavoTheme.success)
                         MetricCard(title: L10n.t("In Prüfung", "In review"), value: "\(model.reviewCount)", icon: "hourglass")
+                        MetricCard(title: L10n.t("Ops Inbox", "Ops inbox"), value: "\(model.operationsInbox.count)", icon: "tray.full.fill", tint: model.operationsInbox.isEmpty ? NavoTheme.success : NavoTheme.warning)
                         MetricCard(title: L10n.t("Buildfehler", "Build failures"), value: "\(model.buildFailureCount)", icon: "xmark.octagon.fill", tint: model.buildFailureCount > 0 ? NavoTheme.danger : NavoTheme.success)
                     }
 
+                    storePulse
                     operationalPulse
+                    inboxPreview
 
                     if !model.attentionProducts.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
@@ -45,21 +48,21 @@ struct DashboardView: View {
                 .padding(.horizontal)
                 .padding(.bottom, 28)
             }
-            .refreshable { await model.refreshGitHub() }
+            .refreshable { await model.refreshAll() }
         }
         .navigationTitle("NavoOps")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    Task { await model.refreshGitHub() }
+                    Task { await model.refreshAll() }
                 } label: {
-                    if model.isRefreshing {
+                    if model.isRefreshing || model.isRefreshingStores {
                         ProgressView()
                     } else {
                         Image(systemName: "arrow.clockwise")
                     }
                 }
-                .disabled(model.isRefreshing)
+                .disabled(model.isRefreshing || model.isRefreshingStores)
                 .accessibilityLabel(L10n.t("Synchronisieren", "Sync"))
             }
         }
@@ -76,7 +79,7 @@ struct DashboardView: View {
                 Text("Operations Control Center")
                     .font(.title2.bold())
                 if let date = model.lastRefresh {
-                    Text(L10n.t("Synchronisiert ", "Synced ") + date.formatted(date: .omitted, time: .shortened))
+                    Text(L10n.t("GitHub synchronisiert ", "GitHub synced ") + date.formatted(date: .omitted, time: .shortened))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 } else {
@@ -90,19 +93,72 @@ struct DashboardView: View {
         .padding(.top, 8)
     }
 
+    private var storePulse: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(L10n.t("Live Store Sync", "Live Store Sync"))
+                        .font(.headline)
+                    if let generatedAt = model.storeGeneratedAt {
+                        Text(L10n.t("Bridge-Stand: ", "Bridge snapshot: ") + generatedAt.formatted(date: .abbreviated, time: .shortened))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text(L10n.t("Noch kein Store-Snapshot geladen", "No store snapshot loaded yet"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
+                Image(systemName: "point.3.filled.connected.trianglepath.dotted")
+                    .font(.title2)
+                    .foregroundStyle(NavoTheme.accent)
+            }
+
+            HStack(spacing: 8) {
+                sourceBadge(title: "Apple", available: model.appleLiveAvailable)
+                sourceBadge(title: "Google Play", available: model.googleLiveAvailable)
+            }
+
+            if let error = model.storeErrorMessage, !error.isEmpty {
+                Label(error, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(NavoTheme.warning)
+            }
+        }
+        .navoCard()
+    }
+
+    private func sourceBadge(title: String, available: Bool) -> some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(available ? NavoTheme.success : NavoTheme.warning)
+                .frame(width: 7, height: 7)
+            Text(title)
+                .font(.caption.weight(.semibold))
+            Text(available ? "LIVE" : L10n.t("NICHT VERBUNDEN", "NOT CONNECTED"))
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(.thinMaterial, in: Capsule())
+    }
+
     private var operationalPulse: some View {
         let hasFailure = model.buildFailureCount > 0
+        let hasCritical = model.operationsInbox.contains { $0.priority == .critical }
         let hasAttention = model.attentionCount > 0
-        let tint = hasFailure ? NavoTheme.danger : (hasAttention ? NavoTheme.warning : NavoTheme.success)
+        let tint = (hasFailure || hasCritical) ? NavoTheme.danger : (hasAttention ? NavoTheme.warning : NavoTheme.success)
         let title = hasFailure
             ? L10n.t("Buildfehler erkannt", "Build failures detected")
-            : (hasAttention ? L10n.t("Release-Arbeit offen", "Release work pending") : L10n.t("Systemlage stabil", "Operations stable"))
+            : (hasCritical ? L10n.t("Store-Aktion erforderlich", "Store action required") : (hasAttention ? L10n.t("Release-Arbeit offen", "Release work pending") : L10n.t("Systemlage stabil", "Operations stable")))
         let detail = hasFailure
             ? L10n.t("Mindestens ein beobachtetes Repository hat einen fehlgeschlagenen GitHub-Actions-Lauf.", "At least one tracked repository has a failed GitHub Actions run.")
-            : L10n.t("\(model.attentionCount) Produkte benötigen aktuell manuelle Aufmerksamkeit.", "\(model.attentionCount) products currently need manual attention.")
+            : L10n.t("\(model.operationsInbox.count) Vorgänge befinden sich aktuell in der Operations Inbox.", "\(model.operationsInbox.count) items are currently in the Operations Inbox.")
 
         return HStack(spacing: 14) {
-            Image(systemName: hasFailure ? "bolt.trianglebadge.exclamationmark.fill" : "waveform.path.ecg")
+            Image(systemName: (hasFailure || hasCritical) ? "bolt.trianglebadge.exclamationmark.fill" : "waveform.path.ecg")
                 .font(.title2)
                 .foregroundStyle(tint)
                 .frame(width: 46, height: 46)
@@ -114,6 +170,69 @@ struct DashboardView: View {
             Spacer()
         }
         .navoCard()
+    }
+
+    private var inboxPreview: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                SectionTitle(
+                    title: L10n.t("Operations Inbox", "Operations Inbox"),
+                    subtitle: L10n.t("Builds, Apple, Google Play und Releases priorisiert", "Builds, Apple, Google Play and releases prioritized")
+                )
+                Spacer()
+                NavigationLink {
+                    OperationsInboxView()
+                } label: {
+                    Text(L10n.t("Alle", "All"))
+                        .font(.subheadline.weight(.semibold))
+                }
+            }
+
+            if model.operationsInbox.isEmpty {
+                HStack(spacing: 12) {
+                    Image(systemName: "checkmark.seal.fill")
+                        .foregroundStyle(NavoTheme.success)
+                    Text(L10n.t("Keine offenen Vorgänge.", "No open operations."))
+                        .font(.subheadline)
+                    Spacer()
+                }
+                .navoCard(padding: 13)
+            } else {
+                ForEach(model.operationsInbox.prefix(4)) { item in
+                    NavigationLink(value: item.productID ?? "") {
+                        HStack(spacing: 12) {
+                            Image(systemName: inboxIcon(item))
+                                .foregroundStyle(item.priority == .critical ? NavoTheme.danger : NavoTheme.warning)
+                                .frame(width: 34, height: 34)
+                                .background((item.priority == .critical ? NavoTheme.danger : NavoTheme.warning).opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(item.title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .lineLimit(1)
+                                Text(item.detail)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                            Spacer()
+                        }
+                        .navoCard(padding: 12)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(item.productID == nil)
+                }
+            }
+        }
+    }
+
+    private func inboxIcon(_ item: OperationsInboxItem) -> String {
+        switch item.kind {
+        case .build: return "hammer.fill"
+        case .apple: return "apple.logo"
+        case .google: return "play.rectangle.fill"
+        case .release: return "shippingbox.fill"
+        case .pullRequest: return "arrow.triangle.pull"
+        }
     }
 
     private var activitySection: some View {

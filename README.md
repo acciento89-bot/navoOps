@@ -1,24 +1,37 @@
 # NavoOps
 
-NavoOps is the private Kamilunavo operations control center for iPhone and iPad. It combines portfolio state, release readiness and GitHub health in one native SwiftUI app designed for Apple Business Manager Custom App distribution.
+NavoOps is the private Kamilunavo operations control center for iPhone and iPad. It combines portfolio state, release readiness, live App Store state and GitHub health in one native SwiftUI app designed for Apple Business Manager Custom App distribution.
 
-## Current 1.0 scope
+## Current 1.1 scope
 
 - Premium dark Kamilunavo dashboard with adaptive iPhone/iPad layout
 - Persistent Kamilunavo product portfolio
-- Apple and Google release states per product
+- Live App Store Connect version, build and review/distribution state through the Kamilunavo bridge
+- Store bridge architecture that keeps App Store Connect credentials outside the iOS app
+- Google Play feed model and UI fallback, ready for the Google Publisher bridge
+- Prioritized Operations Inbox for build failures, store reviews/rejections and release work
 - Apple- and Google-specific store-readiness checklists
-- Release Center filters for attention, review and live products
+- Release Center driven by live store snapshots when available
 - GitHub repository inventory, open PRs and open issues
 - Latest commit and latest GitHub Actions health per tracked repository
 - GitHub issue creation directly from a product detail screen
+- GitHub Quick Action to re-run failed workflow jobs
 - Fine-grained GitHub token stored only in iOS Keychain
 - Optional Face ID / Touch ID / device-passcode lock
 - Local notifications for newly detected failed GitHub Actions workflows
+- Local notifications for relevant Apple/Google store-state transitions
 - Opportunistic iOS background refresh
 - German UI on German devices, English UI everywhere else
 - Privacy manifest with no tracking or collected-data declarations
 - Deterministic, opaque Kamilunavo app icon generated during the build
+
+## Store bridge
+
+NavoOps deliberately does not contain App Store Connect or Google Play service-account private keys. A GitHub Actions bridge produces a sanitized JSON snapshot at:
+
+`acciento89-bot/onemorefloor/generated/navoops/store-status.json`
+
+The app reads that snapshot using the GitHub token already stored in Keychain. The Apple bridge currently refreshes automatically every hour and can also be requested manually from NavoOps Settings. Google Play remains on the local fallback until its Publisher API bridge reports `googleAvailable: true`.
 
 ## Stack
 
@@ -50,7 +63,7 @@ The project is configured for Apple Team `TKG684N5GL` with automatic signing. If
 
 ## GitHub access
 
-NavoOps ships without credentials. Add a fine-grained GitHub token in Settings. Read-only repository metadata, contents, pull requests and Actions permissions are sufficient for monitoring. Issue creation additionally requires Issues write permission.
+NavoOps ships without credentials. Add a fine-grained GitHub token in Settings. Read-only repository metadata, contents, pull requests and Actions permissions are sufficient for monitoring and loading the store snapshot. Issue creation needs Issues write permission. Re-running workflows or manually dispatching the store bridge needs Actions write permission.
 
 ## Custom App distribution
 
