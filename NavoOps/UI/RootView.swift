@@ -23,7 +23,7 @@ struct RootView: View {
         .tint(NavoTheme.accent)
         .task {
             if KeychainStore.githubToken != nil, model.lastRefresh == nil {
-                await model.refreshGitHub()
+                await model.refreshAll()
             }
         }
     }
