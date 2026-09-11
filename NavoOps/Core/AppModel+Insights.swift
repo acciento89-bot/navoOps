@@ -64,12 +64,12 @@ extension AppModel {
     }
 
     var opsInsights: [OpsInsight] {
-        var insights: [OpsInsight] = systemInsights
+        var output: [OpsInsight] = systemInsights
         for product in products {
-            insights.append(contentsOf: insights(for: product))
+            output.append(contentsOf: insights(for: product))
         }
 
-        return insights.sorted {
+        return output.sorted {
             if $0.severity != $1.severity { return $0.severity > $1.severity }
             let lhsDate = $0.date ?? .distantPast
             let rhsDate = $1.date ?? .distantPast
