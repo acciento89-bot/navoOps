@@ -45,7 +45,7 @@ targets:
     preBuildScripts:
       - name: Generate deterministic App Icon
         script: |
-          /usr/bin/xcrun swift "$SRCROOT/scripts/generate_app_icon.swift"
+          /usr/bin/env -u SDKROOT -u IPHONEOS_DEPLOYMENT_TARGET -u PLATFORM_NAME -u EFFECTIVE_PLATFORM_NAME /usr/bin/xcrun --sdk macosx swift "$SRCROOT/scripts/generate_app_icon.swift"
 
   NavoOpsTests:
     type: bundle.unit-test
