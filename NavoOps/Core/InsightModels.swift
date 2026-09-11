@@ -15,13 +15,16 @@ struct OpsInsight: Identifiable, Hashable {
     enum Kind: Hashable {
         case build
         case store
-        case release
         case parity
         case readiness
         case freshness
         case inventory
         case github
         case history
+
+        // Release progression is presented using the store icon/category while
+        // keeping call sites semantically explicit.
+        static var release: Self { .store }
     }
 
     let id: String
