@@ -45,6 +45,7 @@ struct ProductDetailView: View {
     var body: some View {
         Form {
             summarySection
+            intelligenceSection
             releaseSection
             readinessSection
             githubSection
@@ -79,6 +80,67 @@ struct ProductDetailView: View {
             }
         }
         .listRowBackground(NavoTheme.surface)
+    }
+
+    private var intelligenceSection: some View {
+        let insights = model.insights(for: product)
+        let actionable = insights.filter { $0.severity != .info }
+        let snapshot = model.productIntelligence.first { $0.product.id == product.id }
+
+        return Section(L10n.t("Ops Intelligence", "Ops Intelligence")) {
+            HStack {
+                Label(L10n.t("Produkt-Score", "Product score"), systemImage: "brain.head.profile")
+                Spacer()
+                Text("\(snapshot?.score ?? 100)")
+                    .font(.title3.monospacedDigit().bold())
+                    .foregroundStyle(productScoreColor(snapshot?.score ?? 100))
+            }
+
+            if product.supportsApple && product.supportsGoogle {
+                HStack {
+                    Text(L10n.t("Store-Parität", "Store parity"))
+                    Spacer()
+                    Label(
+                        model.isCrossPlatformAligned(product) ? L10n.t("Synchron", "Aligned") : L10n.t("Drift", "Drift"),
+                        systemImage: model.isCrossPlatformAligned(product) ? "checkmark.circle.fill" : "arrow.left.arrow.right.circle.fill"
+                    )
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(model.isCrossPlatformAligned(product) ? NavoTheme.success : NavoTheme.warning)
+                }
+            }
+
+            if actionable.isEmpty {
+                Label(L10n.t("Keine offenen operativen Risiken erkannt.", "No open operational risks detected."), systemImage: "checkmark.seal.fill")
+                    .foregroundStyle(NavoTheme.success)
+            } else {
+                ForEach(actionable.prefix(5)) { insight in
+                    VStack(alignment: .leading, spacing: 5) {
+                        HStack(spacing: 7) {
+                            Image(systemName: insight.kind.systemImage)
+                                .foregroundStyle(insight.severity.color)
+                            Text(insight.title)
+                                .font(.subheadline.weight(.semibold))
+                        }
+                        Text(insight.recommendation)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            NavigationLink {
+                InsightsView()
+            } label: {
+                Label(L10n.t("Gesamte Ops Intelligence öffnen", "Open full Ops Intelligence"), systemImage: "chart.xyaxis.line")
+            }
+        }
+        .listRowBackground(NavoTheme.surface)
+    }
+
+    private func productScoreColor(_ score: Int) -> Color {
+        if score >= 85 { return NavoTheme.success }
+        if score >= 65 { return NavoTheme.warning }
+        return NavoTheme.danger
     }
 
     private var releaseSection: some View {
@@ -236,6 +298,11 @@ struct ProductDetailView: View {
                     Text("\(apple.rawState) · v\(apple.version ?? "–") · Build \(apple.build ?? "–")")
                         .font(.caption.monospaced())
                         .foregroundStyle(.secondary)
+                    if let duration = model.observedStateDuration(for: product, provider: .apple) {
+                        Text(L10n.t("Aktueller Status seit mindestens ", "Current status observed for at least ") + duration.formattedOpsDuration)
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
                 }
             }
 
@@ -247,6 +314,11 @@ struct ProductDetailView: View {
                     Text("\(google.rawState) · v\(google.version ?? "–") · Build \(google.build ?? "–")")
                         .font(.caption.monospaced())
                         .foregroundStyle(.secondary)
+                    if let duration = model.observedStateDuration(for: product, provider: .google) {
+                        Text(L10n.t("Aktueller Status seit mindestens ", "Current status observed for at least ") + duration.formattedOpsDuration)
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
                 }
             }
 
@@ -388,5 +460,15 @@ private struct IssueComposerView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+}
+
+private extension TimeInterval {
+    var formattedOpsDuration: String {
+        let hours = Int(self / 3600)
+        if hours < 1 { return L10n.t("< 1 Std.", "< 1 hr") }
+        if hours < 24 { return L10n.t("\(hours) Std.", "\(hours) hr") }
+        let days = max(1, hours / 24)
+        return L10n.t("\(days) Tage", "\(days) days")
     }
 }
