@@ -2,7 +2,7 @@
   "appName": "NavoOps",
   "subtitle": "Kamilunavo Operations",
   "bundleId": "com.kamilunavo.NavoOps",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "primaryCategory": "BUSINESS",
   "distribution": "PRIVATE_CUSTOM_APP",
   "privacyUrl": "https://www.kamilunavo.com/privacy",
@@ -13,11 +13,15 @@
   "collectedData": [],
   "requiresAccount": false,
   "reviewNotes": {
-    "de": "NavoOps ist das interne Operations-Dashboard von Kamilunavo. Die App ist ohne Anmeldung prüfbar. Die optionale GitHub-Anbindung wird vom Benutzer mit einem eigenen Fine-grained Token aktiviert; der Token wird ausschließlich im iOS-Keychain gespeichert.",
-    "en": "NavoOps is Kamilunavo's internal operations dashboard. The app can be reviewed without signing in. Optional GitHub connectivity is enabled by the user with their own fine-grained token; the token is stored only in iOS Keychain."
+    "de": "NavoOps ist das interne Operations-Dashboard von Kamilunavo. Die App ist ohne Anmeldung prüfbar. Die optionale GitHub-Anbindung wird vom Benutzer mit einem eigenen Fine-grained Token aktiviert; der Token wird ausschließlich im iOS-Keychain gespeichert. Store-Zustände werden über eine Kamilunavo-Bridge als bereinigte Statusdaten geladen; App-Store-Connect- und Google-Play-Zugangsdaten sind nicht in der App enthalten.",
+    "en": "NavoOps is Kamilunavo's internal operations dashboard. The app can be reviewed without signing in. Optional GitHub connectivity is enabled by the user with their own fine-grained token; the token is stored only in iOS Keychain. Store state is loaded as sanitized status data through a Kamilunavo bridge; App Store Connect and Google Play credentials are not embedded in the app."
   },
   "description": {
-    "de": "NavoOps bündelt den operativen Status der Kamilunavo-Produkte in einer internen App. Portfolio, Apple- und Google-Releasezustände, Store-Readiness, GitHub-Repositories, Pull Requests, Issues und Build-Zustände sind zentral einsehbar. Release-Checklisten und interne Notizen bleiben lokal auf dem Gerät. Eine optionale GitHub-Verbindung ermöglicht aktuelle Repository- und Workflow-Daten.",
-    "en": "NavoOps centralizes the operational status of Kamilunavo products in one internal app. Portfolio, Apple and Google release states, store readiness, GitHub repositories, pull requests, issues and build health are available in one place. Release checklists and internal notes stay local on device. Optional GitHub connectivity provides current repository and workflow data."
+    "de": "NavoOps bündelt den operativen Status der Kamilunavo-Produkte in einer internen App. Live-Zustände aus App Store Connect und Google Play, Release-Readiness, GitHub-Repositories, Pull Requests, Issues und Build-Zustände werden zentral zusammengeführt. Ops Intelligence erkennt Ablehnungen, Store- und Versions-Drift, fehlende Zuordnungen, veraltete Datenquellen und Release-Risiken und leitet daraus priorisierte nächste Schritte sowie einen transparenten Operations-Score ab. Status- und Versionswechsel werden lokal als Verlauf gespeichert. Release-Checklisten, Verlaufsdaten und interne Notizen bleiben auf dem Gerät.",
+    "en": "NavoOps centralizes the operational status of Kamilunavo products in one internal app. Live state from App Store Connect and Google Play, release readiness, GitHub repositories, pull requests, issues and build health are combined in one place. Ops Intelligence detects rejections, store and version drift, missing mappings, stale data sources and release risks, then derives prioritized next actions and a transparent operations score. Store status and version changes are kept locally as history. Release checklists, history and internal notes remain on device."
+  },
+  "whatsNew": {
+    "de": "Neu in 1.2: Ops Intelligence mit Portfolio- und Produkt-Score, priorisierten Handlungsempfehlungen, Apple/Google-Paritätsprüfung, Versions-Drift, Datenquellen-Abdeckung und -Aktualität, Repository-Gesundheit sowie lokalem Store-Statusverlauf.",
+    "en": "New in 1.2: Ops Intelligence with portfolio and product scores, prioritized recommendations, Apple/Google parity checks, version drift, source coverage and freshness, repository health, and local store-status history."
   }
 }
