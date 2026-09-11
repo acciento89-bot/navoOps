@@ -8,24 +8,33 @@ final class AppModel: ObservableObject {
     @Published var pullRequests: [PullRequestSnapshot] = []
     @Published var issues: [IssueSnapshot] = []
     @Published var healthByRepository: [String: RepositoryHealth] = [:]
+    @Published var repositoryAnalytics: [String: RepositoryAnalytics] = [:]
     @Published var activities: [ActivityItem] = []
     @Published var storeFeed: StoreStatusFeed?
     @Published var storeHistory: [StoreHistoryEvent] = []
+    @Published var analyticsFeed: AnalyticsFeed?
+    @Published var analyticsHistory: [AnalyticsObservation] = []
     @Published var isRefreshing = false
     @Published var isRefreshingStores = false
+    @Published var isRefreshingAnalytics = false
     @Published var lastRefresh: Date?
     @Published var errorMessage: String?
     @Published var storeErrorMessage: String?
+    @Published var analyticsErrorMessage: String?
     @Published var storeRefreshRequested = false
 
     private let github = GitHubService()
+    private let githubAnalytics = GitHubAnalyticsService()
     private let storeStatus = StoreStatusService()
+    private let analyticsService = AnalyticsService()
     private let portfolioStore = PortfolioStore()
     private let storeHistoryStore = StoreHistoryStore()
+    private let analyticsHistoryStore = AnalyticsHistoryStore()
 
     init() {
         products = portfolioStore.loadMerged(with: ProductCatalog.seed)
         storeHistory = storeHistoryStore.load()
+        analyticsHistory = analyticsHistoryStore.load()
     }
 
     var fullyLiveCount: Int {
@@ -146,6 +155,10 @@ final class AppModel: ObservableObject {
         healthByRepository[product.repository]
     }
 
+    func engineering(for product: ProductApp) -> RepositoryAnalytics? {
+        repositoryAnalytics[product.repository]
+    }
+
     func pullRequests(for product: ProductApp) -> [PullRequestSnapshot] {
         pullRequests.filter { repositoryMatches($0.repository, product.repository) }
     }
@@ -156,6 +169,10 @@ final class AppModel: ObservableObject {
 
     func storeSnapshot(for product: ProductApp, provider: StoreProvider) -> StoreAppSnapshot? {
         storeFeed?.apps.first { $0.provider == provider && $0.matches(product) }
+    }
+
+    func analyticsSnapshot(for product: ProductApp, provider: StoreProvider) -> AppAnalyticsSnapshot? {
+        analyticsFeed?.apps.first { $0.provider == provider && $0.matches(product) }
     }
 
     func resolvedAppleState(for product: ProductApp) -> ProductApp.StoreState {
@@ -181,6 +198,7 @@ final class AppModel: ObservableObject {
     func refreshAll() async {
         await refreshGitHub()
         await refreshStores()
+        await refreshAnalytics()
     }
 
     func refreshGitHub() async {
@@ -190,6 +208,7 @@ final class AppModel: ObservableObject {
 
         let trackedRepositories = Array(Set(products.map(\.repository)))
         async let healthTask = github.fetchRepositoryHealth(repositories: trackedRepositories)
+        async let analyticsTask = githubAnalytics.fetch(repositories: trackedRepositories)
 
         do {
             async let reposTask = github.fetchRepositories()
@@ -198,11 +217,13 @@ final class AppModel: ObservableObject {
 
             let (repos, prs, issueList) = try await (reposTask, prsTask, issuesTask)
             let health = await healthTask
+            let engineering = await analyticsTask
 
             repositories = repos
             pullRequests = prs
             issues = issueList
             healthByRepository = health
+            repositoryAnalytics = engineering
             lastRefresh = .now
             activities = buildActivities()
             errorMessage = nil
@@ -211,6 +232,7 @@ final class AppModel: ObservableObject {
             BackgroundSyncService.shared.schedule()
         } catch {
             healthByRepository = await healthTask
+            repositoryAnalytics = await analyticsTask
             activities = buildActivities()
             errorMessage = error.localizedDescription
         }
@@ -233,6 +255,21 @@ final class AppModel: ObservableObject {
         }
     }
 
+    func refreshAnalytics() async {
+        guard !isRefreshingAnalytics else { return }
+        isRefreshingAnalytics = true
+        defer { isRefreshingAnalytics = false }
+
+        do {
+            let feed = try await analyticsService.fetchFeed()
+            analyticsFeed = feed
+            analyticsHistory = analyticsHistoryStore.record(feed: feed, products: products, existing: analyticsHistory)
+            analyticsErrorMessage = nil
+        } catch {
+            analyticsErrorMessage = error.localizedDescription
+        }
+    }
+
     func requestStoreBridgeRefresh() async {
         do {
             try await storeStatus.requestBridgeRefresh()
@@ -240,6 +277,15 @@ final class AppModel: ObservableObject {
             storeErrorMessage = nil
         } catch {
             storeErrorMessage = error.localizedDescription
+        }
+    }
+
+    func requestAnalyticsBridgeRefresh() async {
+        do {
+            try await analyticsService.requestRefresh()
+            analyticsErrorMessage = nil
+        } catch {
+            analyticsErrorMessage = error.localizedDescription
         }
     }
 
@@ -258,6 +304,11 @@ final class AppModel: ObservableObject {
     func resetStoreHistory() {
         storeHistoryStore.reset()
         storeHistory = []
+    }
+
+    func resetAnalyticsHistory() {
+        analyticsHistoryStore.reset()
+        analyticsHistory = []
     }
 
     func createIssue(for product: ProductApp, title: String, body: String) async throws -> IssueSnapshot {
