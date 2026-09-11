@@ -73,7 +73,7 @@ struct DashboardView: View {
                     .font(.caption.weight(.black))
                     .tracking(1.5)
                     .foregroundStyle(NavoTheme.accent)
-                Text(L10n.t("Operations Control Center", "Operations Control Center"))
+                Text("Operations Control Center")
                     .font(.title2.bold())
                 if let date = model.lastRefresh {
                     Text(L10n.t("Synchronisiert ", "Synced ") + date.formatted(date: .omitted, time: .shortened))
@@ -124,11 +124,15 @@ struct DashboardView: View {
             )
 
             if model.activities.isEmpty {
-                ContentUnavailableView(
-                    L10n.t("Noch keine GitHub-Aktivität", "No GitHub activity yet"),
-                    systemImage: "bolt.horizontal.circle",
-                    description: Text(L10n.t("Hinterlege einen GitHub-Token und synchronisiere NavoOps.", "Add a GitHub token and sync NavoOps."))
-                )
+                ContentUnavailableView {
+                    Label {
+                        Text(L10n.t("Noch keine GitHub-Aktivität", "No GitHub activity yet"))
+                    } icon: {
+                        Image(systemName: "bolt.horizontal.circle")
+                    }
+                } description: {
+                    Text(L10n.t("Hinterlege einen GitHub-Token und synchronisiere NavoOps.", "Add a GitHub token and sync NavoOps."))
+                }
                 .frame(minHeight: 180)
                 .navoCard()
             } else {
