@@ -5,6 +5,7 @@ struct StoreStatusService: Sendable {
         case missingToken
         case invalidResponse(Int)
         case invalidPayload
+        case allBridgesUnavailable
 
         var errorDescription: String? {
             switch self {
@@ -14,19 +15,69 @@ struct StoreStatusService: Sendable {
                 return L10n.t("Store-Bridge antwortete mit HTTP \(status).", "Store bridge returned HTTP \(status).")
             case .invalidPayload:
                 return L10n.t("Store-Status konnte nicht gelesen werden.", "Store status could not be decoded.")
+            case .allBridgesUnavailable:
+                return L10n.t("Keine Store-Bridge ist erreichbar.", "No store bridge is reachable.")
             }
         }
     }
 
+    private struct Bridge: Sendable {
+        let repository: String
+        let feedPath: String
+        let workflowFile: String
+    }
+
     private let owner = "acciento89-bot"
-    private let bridgeRepository = "onemorefloor"
-    private let feedPath = "generated/navoops/store-status.json"
-    private let workflowFile = "navoops-store-feed.yml"
+    private let appleBridge = Bridge(
+        repository: "onemorefloor",
+        feedPath: "generated/navoops/store-status.json",
+        workflowFile: "navoops-store-feed.yml"
+    )
+    private let googleBridge = Bridge(
+        repository: "maengelfix",
+        feedPath: "generated/navoops/google-store-status.json",
+        workflowFile: "navoops-google-store-feed.yml"
+    )
 
     func fetchFeed() async throws -> StoreStatusFeed {
         guard let token = KeychainStore.githubToken, !token.isEmpty else { throw ServiceError.missingToken }
 
-        var components = URLComponents(string: "https://api.github.com/repos/\(owner)/\(bridgeRepository)/contents/\(feedPath)")!
+        async let appleTask: StoreStatusFeed? = try? fetch(appleBridge, token: token)
+        async let googleTask: StoreStatusFeed? = try? fetch(googleBridge, token: token)
+        let (apple, google) = await (appleTask, googleTask)
+
+        let feeds = [apple, google].compactMap { $0 }
+        guard !feeds.isEmpty else { throw ServiceError.allBridgesUnavailable }
+
+        let mergedApps = Dictionary(
+            feeds.flatMap(\.apps).map { ($0.id, $0) },
+            uniquingKeysWith: { _, latest in latest }
+        ).values.sorted {
+            if $0.provider != $1.provider { return $0.provider.rawValue < $1.provider.rawValue }
+            return $0.appName.localizedCaseInsensitiveCompare($1.appName) == .orderedAscending
+        }
+
+        return StoreStatusFeed(
+            schemaVersion: feeds.map(\.schemaVersion).max() ?? 1,
+            generatedAt: feeds.map(\.generatedAt).max() ?? .now,
+            sourceRepository: feeds.compactMap(\.sourceRepository).joined(separator: ", "),
+            appleAvailable: feeds.contains(where: \.appleAvailable),
+            googleAvailable: feeds.contains(where: \.googleAvailable),
+            apps: mergedApps
+        )
+    }
+
+    func requestBridgeRefresh() async throws {
+        guard let token = KeychainStore.githubToken, !token.isEmpty else { throw ServiceError.missingToken }
+
+        async let appleSucceeded = dispatchSafely(appleBridge, token: token)
+        async let googleSucceeded = dispatchSafely(googleBridge, token: token)
+        let succeeded = await [appleSucceeded, googleSucceeded]
+        guard succeeded.contains(true) else { throw ServiceError.allBridgesUnavailable }
+    }
+
+    private func fetch(_ bridge: Bridge, token: String) async throws -> StoreStatusFeed {
+        var components = URLComponents(string: "https://api.github.com/repos/\(owner)/\(bridge.repository)/contents/\(bridge.feedPath)")!
         components.queryItems = [URLQueryItem(name: "ref", value: "main")]
         var request = URLRequest(url: components.url!)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -52,9 +103,17 @@ struct StoreStatusService: Sendable {
         }
     }
 
-    func requestBridgeRefresh() async throws {
-        guard let token = KeychainStore.githubToken, !token.isEmpty else { throw ServiceError.missingToken }
-        let url = URL(string: "https://api.github.com/repos/\(owner)/\(bridgeRepository)/actions/workflows/\(workflowFile)/dispatches")!
+    private func dispatchSafely(_ bridge: Bridge, token: String) async -> Bool {
+        do {
+            try await dispatch(bridge, token: token)
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    private func dispatch(_ bridge: Bridge, token: String) async throws {
+        let url = URL(string: "https://api.github.com/repos/\(owner)/\(bridge.repository)/actions/workflows/\(bridge.workflowFile)/dispatches")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
