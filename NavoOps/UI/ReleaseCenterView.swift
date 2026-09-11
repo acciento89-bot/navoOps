@@ -22,10 +22,21 @@ struct ReleaseCenterView: View {
 
     private var filteredProducts: [ProductApp] {
         switch filter {
-        case .all: return model.products
-        case .attention: return model.products.filter(\.needsAttention)
-        case .review: return model.products.filter(\.isInReview)
-        case .live: return model.products.filter(\.isFullyLive)
+        case .all:
+            return model.products
+        case .attention:
+            return model.attentionProducts
+        case .review:
+            return model.products.filter { product in
+                (product.supportsApple && model.resolvedAppleState(for: product) == .review) ||
+                (product.supportsGoogle && model.resolvedGoogleState(for: product) == .review)
+            }
+        case .live:
+            return model.products.filter { product in
+                let appleOK = !product.supportsApple || model.resolvedAppleState(for: product) == .live
+                let googleOK = !product.supportsGoogle || model.resolvedGoogleState(for: product) == .live
+                return appleOK && googleOK
+            }
         }
     }
 
@@ -34,6 +45,8 @@ struct ReleaseCenterView: View {
             NavoTheme.background.ignoresSafeArea()
             ScrollView {
                 VStack(spacing: 16) {
+                    storeSourceSummary
+
                     Picker(L10n.t("Filter", "Filter"), selection: $filter) {
                         ForEach(Filter.allCases, id: \.self) { item in
                             Text(item.title).tag(item)
@@ -50,17 +63,47 @@ struct ReleaseCenterView: View {
                 }
                 .padding()
             }
-            .refreshable { await model.refreshGitHub() }
+            .refreshable { await model.refreshAll() }
         }
         .navigationTitle(L10n.t("Release Center", "Release Center"))
     }
 
+    private var storeSourceSummary: some View {
+        HStack(spacing: 12) {
+            sourcePill("Apple", available: model.appleLiveAvailable)
+            sourcePill("Google Play", available: model.googleLiveAvailable)
+            Spacer()
+            if let date = model.storeGeneratedAt {
+                Text(date, style: .relative)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .navoCard(padding: 12)
+    }
+
+    private func sourcePill(_ name: String, available: Bool) -> some View {
+        HStack(spacing: 5) {
+            Circle()
+                .fill(available ? NavoTheme.success : NavoTheme.warning)
+                .frame(width: 7, height: 7)
+            Text(name)
+                .font(.caption.weight(.semibold))
+            Text(available ? "LIVE" : L10n.t("LOKAL", "LOCAL"))
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(.secondary)
+        }
+    }
+
     private func releaseCard(_ product: ProductApp) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
+        let appleSnapshot = model.storeSnapshot(for: product, provider: .apple)
+        let googleSnapshot = model.storeSnapshot(for: product, provider: .google)
+
+        return VStack(alignment: .leading, spacing: 14) {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(product.name).font(.headline)
-                    Text("v\(product.version) · Build \(product.build)")
+                    Text("v\(model.resolvedVersion(for: product)) · Build \(model.resolvedBuild(for: product))")
                         .font(.caption.monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
@@ -71,8 +114,19 @@ struct ReleaseCenterView: View {
             }
 
             HStack(spacing: 8) {
-                if product.supportsApple { StoreStateBadge(label: "Apple", state: product.appleState) }
-                if product.supportsGoogle { StoreStateBadge(label: "Google", state: product.googleState) }
+                if product.supportsApple {
+                    StoreStateBadge(label: appleSnapshot == nil ? "Apple" : "Apple · Live", state: model.resolvedAppleState(for: product))
+                }
+                if product.supportsGoogle {
+                    StoreStateBadge(label: googleSnapshot == nil ? "Google" : "Google · Live", state: model.resolvedGoogleState(for: product))
+                }
+            }
+
+            if let appleSnapshot {
+                storeDetail(snapshot: appleSnapshot)
+            }
+            if let googleSnapshot {
+                storeDetail(snapshot: googleSnapshot)
             }
 
             if product.supportsApple {
@@ -90,5 +144,23 @@ struct ReleaseCenterView: View {
             }
         }
         .navoCard()
+    }
+
+    @ViewBuilder
+    private func storeDetail(snapshot: StoreAppSnapshot) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: snapshot.provider == .apple ? "apple.logo" : "play.rectangle.fill")
+                .foregroundStyle(.secondary)
+            Text(snapshot.rawState)
+                .font(.caption.monospaced())
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            Spacer()
+            if let updated = snapshot.updatedAt {
+                Text(updated, style: .relative)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+        }
     }
 }
