@@ -1,0 +1,23 @@
+{
+  "appName": "NavoOps",
+  "subtitle": "Kamilunavo Operations",
+  "bundleId": "com.kamilunavo.NavoOps",
+  "version": "1.0.0",
+  "primaryCategory": "BUSINESS",
+  "distribution": "PRIVATE_CUSTOM_APP",
+  "privacyUrl": "https://www.kamilunavo.com/privacy",
+  "supportUrl": "https://www.kamilunavo.com",
+  "marketingUrl": "https://www.kamilunavo.com",
+  "ageRating": "4+",
+  "tracking": false,
+  "collectedData": [],
+  "requiresAccount": false,
+  "reviewNotes": {
+    "de": "NavoOps ist das interne Operations-Dashboard von Kamilunavo. Die App ist ohne Anmeldung prüfbar. Die optionale GitHub-Anbindung wird vom Benutzer mit einem eigenen Fine-grained Token aktiviert; der Token wird ausschließlich im iOS-Keychain gespeichert.",
+    "en": "NavoOps is Kamilunavo's internal operations dashboard. The app can be reviewed without signing in. Optional GitHub connectivity is enabled by the user with their own fine-grained token; the token is stored only in iOS Keychain."
+  },
+  "description": {
+    "de": "NavoOps bündelt den operativen Status der Kamilunavo-Produkte in einer internen App. Portfolio, Apple- und Google-Releasezustände, Store-Readiness, GitHub-Repositories, Pull Requests, Issues und Build-Zustände sind zentral einsehbar. Release-Checklisten und interne Notizen bleiben lokal auf dem Gerät. Eine optionale GitHub-Verbindung ermöglicht aktuelle Repository- und Workflow-Daten.",
+    "en": "NavoOps centralizes the operational status of Kamilunavo products in one internal app. Portfolio, Apple and Google release states, store readiness, GitHub repositories, pull requests, issues and build health are available in one place. Release checklists and internal notes stay local on device. Optional GitHub connectivity provides current repository and workflow data."
+  }
+}

@@ -2,24 +2,44 @@ name: iOS CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, feature/**]
   pull_request:
 
 jobs:
-  build:
+  build-and-test:
     runs-on: macos-15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+
       - name: Install XcodeGen
         run: brew install xcodegen
-      - name: Generate project
+
+      - name: Validate privacy manifest
+        run: plutil -lint NavoOps/Resources/PrivacyInfo.xcprivacy
+
+      - name: Generate app icon
+        run: xcrun swift scripts/generate_app_icon.swift
+
+      - name: Verify opaque 1024px app icon
+        run: |
+          test -s NavoOps/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png
+          sips -g pixelWidth -g pixelHeight -g hasAlpha NavoOps/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png
+
+      - name: Generate Xcode project
         run: xcodegen generate
-      - name: Build
+
+      - name: Select simulator
+        id: simulator
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; data=json.load(sys.stdin); print(next(device["udid"] for devices in data["devices"].values() for device in devices if device.get("isAvailable") and device.get("name", "").startswith("iPhone")))')
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+
+      - name: Build and test
         run: |
           xcodebuild \
             -project NavoOps.xcodeproj \
             -scheme NavoOps \
-            -sdk iphonesimulator \
-            -destination 'generic/platform=iOS Simulator' \
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.udid }}" \
             CODE_SIGNING_ALLOWED=NO \
-            build
+            test

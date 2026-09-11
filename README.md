@@ -1,48 +1,61 @@
 # NavoOps
 
-NavoOps is the private operations control center for Kamilunavo. The iPhone/iPad app centralizes product status, GitHub repositories, release health, open issues and store-readiness checklists in one native SwiftUI interface.
+NavoOps is the private Kamilunavo operations control center for iPhone and iPad. It combines portfolio state, release readiness and GitHub health in one native SwiftUI app designed for Apple Business Manager Custom App distribution.
+
+## Current 1.0 scope
+
+- Premium dark Kamilunavo dashboard with adaptive iPhone/iPad layout
+- Persistent Kamilunavo product portfolio
+- Apple and Google release states per product
+- Apple- and Google-specific store-readiness checklists
+- Release Center filters for attention, review and live products
+- GitHub repository inventory, open PRs and open issues
+- Latest commit and latest GitHub Actions health per tracked repository
+- GitHub issue creation directly from a product detail screen
+- Fine-grained GitHub token stored only in iOS Keychain
+- Optional Face ID / Touch ID / device-passcode lock
+- Local notifications for newly detected failed GitHub Actions workflows
+- Opportunistic iOS background refresh
+- German UI on German devices, English UI everywhere else
+- Privacy manifest with no tracking or collected-data declarations
+- Deterministic, opaque Kamilunavo app icon generated during the build
 
 ## Stack
 
-- SwiftUI + SwiftData
+- SwiftUI
 - iOS/iPadOS 17+
-- GitHub REST API
-- GitHub token stored only in iOS Keychain
-- XcodeGen for reproducible project generation
-- No third-party runtime dependencies
+- Foundation URLSession
+- Security / Keychain
+- LocalAuthentication
+- UserNotifications
+- BackgroundTasks
+- UserDefaults for small local operational state
+- XcodeGen
+- GitHub Actions
 
-## Features
+No third-party runtime dependency is required.
 
-- Portfolio dashboard with live/review/attention metrics
-- Product catalog for Kamilunavo apps
-- GitHub repository sync, including private repositories when a token is configured
-- Per-product workflow status and open pull requests
-- GitHub issue inbox and issue creation
-- Editable Apple/Google release state
-- Store-readiness checklist for Apple and Google
-- Native German/English localization
-- Dark Kamilunavo visual system, adaptive for iPhone and iPad
-
-## Build
+## Build locally
 
 ```bash
 brew install xcodegen
+xcrun swift scripts/generate_app_icon.swift
 xcodegen generate
 open NavoOps.xcodeproj
 ```
 
-The default bundle identifier is `com.kamilunavo.NavoOps`.
+Bundle ID: `com.kamilunavo.NavoOps`
 
-For CI or unsigned simulator builds:
-
-```bash
-xcodebuild -project NavoOps.xcodeproj -scheme NavoOps -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 16 Pro' CODE_SIGNING_ALLOWED=NO build
-```
+The project is configured for Apple Team `TKG684N5GL` with automatic signing. If Xcode cannot resolve signing on a new Mac, select the Kamilunavo development team once in Signing & Capabilities.
 
 ## GitHub access
 
-NavoOps does not ship with credentials. In Settings, add a fine-grained GitHub token with read access to the Kamilunavo repositories. Issue creation additionally requires Issues write permission. The token is persisted in Keychain and never written to source control or UserDefaults.
+NavoOps ships without credentials. Add a fine-grained GitHub token in Settings. Read-only repository metadata, contents, pull requests and Actions permissions are sufficient for monitoring. Issue creation additionally requires Issues write permission.
 
-## Apple Business Manager
+## Custom App distribution
 
-NavoOps is designed for Custom App distribution through App Store Connect / Apple Business Manager. Custom distribution is configured in App Store Connect; no special Apple Business Manager entitlement is required in the app binary.
+See `docs/APPLE_BUSINESS_CUSTOM_APP.md`. The Apple Business Manager Organization ID is configured in App Store Connect and is deliberately not embedded in source code.
+
+## CI
+
+The workflow validates the privacy manifest, generates the deterministic AppIcon, generates the Xcode project and runs the unit-test target on an available iPhone simulator.
