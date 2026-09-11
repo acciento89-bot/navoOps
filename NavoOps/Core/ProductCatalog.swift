@@ -18,7 +18,7 @@ enum ProductCatalog {
         product("lueftungscalc", "LüftungsCalc", "SHK", [.iOS, .android], .review, .development, "1.0", "1", .paid, tags: ["SHK", "Calculator"]),
         product("rohrcalc", "RohrCalc", "SHK", [.iOS, .android], .review, .development, "1.0", "1", .paid, tags: ["SHK", "Calculator"]),
         product("heizkoerpercalc", "HeizkörperCalc", "SHK", [.iOS, .android], .review, .development, "1.0", "1", .paid, tags: ["SHK", "Calculator"]),
-        product("anlagenscheck", "AnlagenCheck", "SHK", [.iOS, .android], .review, .development, "1.0", "1", .paid, tags: ["SHK", "Inspection"]),
+        product("anlagencheck", "AnlagenCheck", "SHK", [.iOS, .android], .review, .development, "1.0", "1", .paid, tags: ["SHK", "Inspection"]),
         product("volumecalc", "VolumeCalc", "AnlagenVolumen", [.iOS, .android], .development, .attention, "1.0", "1", .paid, notes: "Android Statusbar/Topbar und Kontrast prüfen.", tags: ["SHK", "Calculator"]),
         product("keepmeter", "KeepMeter", "keepmeter", [.iOS, .android], .review, .development, "1.0.3", "3", .free, tags: ["Utility"]),
         product("schonerledigt", "Schon erledigt?", "schonerledigt", [.iOS, .android], .review, .review, "1.0", "1", .mixed, tags: ["Productivity"]),
