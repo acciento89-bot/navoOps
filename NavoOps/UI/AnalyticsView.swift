@@ -115,8 +115,8 @@ struct AnalyticsView: View {
 
             LazyVGrid(columns: columns, spacing: 12) {
                 MetricCard(title: L10n.t("Releases · 90 Tage", "Releases · 90 days"), value: "\(summary.releases90d)", icon: "calendar.badge.checkmark", tint: NavoTheme.success)
-                MetricCard(title: L10n.t("Apple Review Ø", "Apple review avg"), value: duration(summary.averageObservedAppleReview), icon: "apple.logo")
-                MetricCard(title: L10n.t("Google Review Ø", "Google review avg"), value: duration(summary.averageObservedGoogleReview), icon: "play.rectangle.fill", tint: NavoTheme.cyan)
+                MetricCard(title: L10n.t("Apple Review Ø", "Apple review avg"), value: formatDuration(summary.averageObservedAppleReview), icon: "apple.logo")
+                MetricCard(title: L10n.t("Google Review Ø", "Google review avg"), value: formatDuration(summary.averageObservedGoogleReview), icon: "play.rectangle.fill", tint: NavoTheme.cyan)
                 MetricCard(title: L10n.t("Aktuell in Review", "Currently in review"), value: "\(model.reviewCount)", icon: "hourglass")
             }
 
@@ -141,7 +141,7 @@ struct AnalyticsView: View {
                                     Text(review.provider.title).font(.caption).foregroundStyle(.secondary)
                                 }
                                 Spacer()
-                                Text(review.age.formattedOpsDuration)
+                                Text(formatDuration(review.age))
                                     .font(.caption.monospacedDigit().weight(.bold))
                             }
                         }
@@ -284,8 +284,20 @@ struct AnalyticsView: View {
         }
     }
 
-    private func duration(_ interval: TimeInterval?) -> String {
-        interval?.formattedOpsDuration ?? "–"
+    private func formatDuration(_ interval: TimeInterval?) -> String {
+        guard let interval else { return "–" }
+        let minutes = max(0, Int(interval / 60))
+        let days = minutes / 1_440
+        let hours = (minutes % 1_440) / 60
+        let remainingMinutes = minutes % 60
+
+        if days > 0 {
+            return hours > 0 ? "\(days)d \(hours)h" : "\(days)d"
+        }
+        if hours > 0 {
+            return remainingMinutes > 0 ? "\(hours)h \(remainingMinutes)m" : "\(hours)h"
+        }
+        return "\(remainingMinutes)m"
     }
 
     private func ciTint(_ rate: Double?) -> Color {
