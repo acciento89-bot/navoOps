@@ -61,9 +61,11 @@ struct StoreStatusService: Sendable {
             schemaVersion: feeds.map(\.schemaVersion).max() ?? 1,
             generatedAt: feeds.map(\.generatedAt).max() ?? .now,
             sourceRepository: feeds.compactMap(\.sourceRepository).joined(separator: ", "),
-            appleAvailable: feeds.contains(where: \.appleAvailable),
-            googleAvailable: feeds.contains(where: \.googleAvailable),
-            apps: mergedApps
+            appleAvailable: apple?.appleAvailable == true,
+            googleAvailable: google?.googleAvailable == true,
+            apps: mergedApps,
+            appleGeneratedAt: apple?.generatedAt,
+            googleGeneratedAt: google?.generatedAt
         )
     }
 
