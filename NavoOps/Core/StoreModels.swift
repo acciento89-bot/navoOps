@@ -115,9 +115,18 @@ extension StoreAppSnapshot {
     }
 
     private static func normalize(_ value: String) -> String {
-        value
-            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
-            .lowercased()
+        // Store metadata may transliterate German umlauts (for example
+        // "WärmeTakt" -> "waerme takt"). Expand those characters before
+        // removing diacritics so both spellings resolve to the same key.
+        var normalized = value.lowercased(with: Locale(identifier: "de_DE"))
+        normalized = normalized
+            .replacingOccurrences(of: "ä", with: "ae")
+            .replacingOccurrences(of: "ö", with: "oe")
+            .replacingOccurrences(of: "ü", with: "ue")
+            .replacingOccurrences(of: "ß", with: "ss")
+
+        return normalized
+            .folding(options: [.diacriticInsensitive, .widthInsensitive], locale: Locale(identifier: "de_DE"))
             .filter { $0.isLetter || $0.isNumber }
     }
 }
