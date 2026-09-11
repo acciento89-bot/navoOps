@@ -17,6 +17,7 @@ struct DashboardView: View {
 
                     LazyVGrid(columns: metricColumns, spacing: 12) {
                         MetricCard(title: L10n.t("Produkte", "Products"), value: "\(model.products.count)", icon: "square.stack.3d.up.fill")
+                        MetricCard(title: L10n.t("Ops Score", "Ops score"), value: "\(model.intelligence.score)", icon: "brain.head.profile", tint: scoreColor)
                         MetricCard(title: L10n.t("Komplett live", "Fully live"), value: "\(model.fullyLiveCount)", icon: "checkmark.seal.fill", tint: NavoTheme.success)
                         MetricCard(title: L10n.t("In Prüfung", "In review"), value: "\(model.reviewCount)", icon: "hourglass")
                         MetricCard(title: L10n.t("Ops Inbox", "Ops inbox"), value: "\(model.operationsInbox.count)", icon: "tray.full.fill", tint: model.operationsInbox.isEmpty ? NavoTheme.success : NavoTheme.warning)
@@ -24,6 +25,7 @@ struct DashboardView: View {
                     }
 
                     storePulse
+                    intelligencePreview
                     operationalPulse
                     inboxPreview
 
@@ -52,7 +54,14 @@ struct DashboardView: View {
         }
         .navigationTitle("NavoOps")
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                NavigationLink {
+                    InsightsView()
+                } label: {
+                    Image(systemName: "brain.head.profile")
+                }
+                .accessibilityLabel(L10n.t("Ops Intelligence öffnen", "Open Ops Intelligence"))
+
                 Button {
                     Task { await model.refreshAll() }
                 } label: {
@@ -66,6 +75,13 @@ struct DashboardView: View {
                 .accessibilityLabel(L10n.t("Synchronisieren", "Sync"))
             }
         }
+    }
+
+    private var scoreColor: Color {
+        let score = model.intelligence.score
+        if score >= 85 { return NavoTheme.success }
+        if score >= 65 { return NavoTheme.warning }
+        return NavoTheme.danger
     }
 
     private var header: some View {
@@ -127,6 +143,42 @@ struct DashboardView: View {
             }
         }
         .navoCard()
+    }
+
+    private var intelligencePreview: some View {
+        let intelligence = model.intelligence
+        return NavigationLink {
+            InsightsView()
+        } label: {
+            HStack(spacing: 14) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 15, style: .continuous)
+                        .fill(scoreColor.opacity(0.13))
+                    Image(systemName: "brain.head.profile")
+                        .font(.title2)
+                        .foregroundStyle(scoreColor)
+                }
+                .frame(width: 50, height: 50)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(L10n.t("Ops Intelligence", "Ops Intelligence"))
+                        .font(.headline)
+                    Text(L10n.t(
+                        "Score \(intelligence.score) · \(intelligence.criticalCount) kritisch · \(intelligence.actionCount) Aktionen · Parität \(intelligence.alignmentPercent)%",
+                        "Score \(intelligence.score) · \(intelligence.criticalCount) critical · \(intelligence.actionCount) actions · parity \(intelligence.alignmentPercent)%"
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption.bold())
+                    .foregroundStyle(.tertiary)
+            }
+            .navoCard()
+        }
+        .buttonStyle(.plain)
     }
 
     private func sourceBadge(title: String, available: Bool) -> some View {
