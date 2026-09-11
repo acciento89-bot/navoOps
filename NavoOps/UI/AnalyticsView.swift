@@ -7,6 +7,13 @@ struct AnalyticsView: View {
     private var summary: PortfolioAnalyticsSummary { model.portfolioAnalytics }
     private let columns = [GridItem(.flexible()), GridItem(.flexible())]
 
+    private var sortedEngineering: [RepositoryAnalytics] {
+        model.repositoryAnalytics.values.sorted { lhs, rhs in
+            if lhs.commitCount30d != rhs.commitCount30d { return lhs.commitCount30d > rhs.commitCount30d }
+            return lhs.repository < rhs.repository
+        }
+    }
+
     var body: some View {
         ZStack {
             NavoTheme.background.ignoresSafeArea()
@@ -68,8 +75,8 @@ struct AnalyticsView: View {
             SectionTitle(title: L10n.t("Kommerziell", "Commercial"), subtitle: L10n.t("Nur Werte aus tatsächlich verfügbaren Store-Berichten", "Only values from actually available store reports"))
 
             LazyVGrid(columns: columns, spacing: 12) {
-                MetricCard(title: L10n.t("Einheiten", "Units"), value: summary.commercialUnits.map(String.init) ?? "–", icon: "cart.fill")
-                MetricCard(title: L10n.t("Downloads", "Downloads"), value: summary.downloads.map(String.init) ?? "–", icon: "arrow.down.app.fill", tint: NavoTheme.cyan)
+                MetricCard(title: L10n.t("Einheiten", "Units"), value: summary.commercialUnits.map { String($0) } ?? "–", icon: "cart.fill")
+                MetricCard(title: L10n.t("Downloads", "Downloads"), value: summary.downloads.map { String($0) } ?? "–", icon: "arrow.down.app.fill", tint: NavoTheme.cyan)
                 MetricCard(title: L10n.t("Abo-Produkte", "Subscription products"), value: "\(summary.configuredSubscriptions)", icon: "repeat.circle.fill", tint: NavoTheme.accent)
                 MetricCard(title: L10n.t("Einmalkäufe", "One-time products"), value: "\(summary.configuredOneTimeProducts)", icon: "creditcard.fill", tint: NavoTheme.cyan)
             }
@@ -153,14 +160,14 @@ struct AnalyticsView: View {
 
             LazyVGrid(columns: columns, spacing: 12) {
                 MetricCard(title: L10n.t("Höchste Crash-Rate", "Highest crash rate"), value: summary.worstCrashRate?.formattedPercent ?? "–", icon: "bolt.trianglebadge.exclamationmark.fill", tint: rateTint(summary.worstCrashRate, warning: 0.01))
-                MetricCard(title: L10n.t("Höchste ANR-Rate", "Highest ANR rate"), value: summary.worstANRRate?.formattedPercent ?? "–", icon: "hourglass.badge.plus", tint: rateTint(summary.worstANRRate, warning: 0.005))
+                MetricCard(title: L10n.t("Höchste ANR-Rate", "Highest ANR rate"), value: summary.worstANRRate?.formattedPercent ?? "–", icon: "hourglass", tint: rateTint(summary.worstANRRate, warning: 0.005))
             }
 
             let risks = model.analyticsRiskProducts()
             if !risks.isEmpty {
                 VStack(alignment: .leading, spacing: 10) {
                     Text(L10n.t("Auffälligkeiten", "Signals")).font(.headline)
-                    ForEach(Array(risks.prefix(8).enumerated()), id: \.element.0.id) { _, item in
+                    ForEach(Array(risks.prefix(8).enumerated()), id: \.offset) { _, item in
                         NavigationLink(value: item.0.id) {
                             HStack {
                                 Text(item.0.name).font(.subheadline.weight(.semibold))
@@ -189,10 +196,7 @@ struct AnalyticsView: View {
             }
 
             VStack(spacing: 0) {
-                ForEach(model.repositoryAnalytics.values.sorted { lhs, rhs in
-                    if lhs.commitCount30d != rhs.commitCount30d { return lhs.commitCount30d > rhs.commitCount30d }
-                    return lhs.repository < rhs.repository
-                }.prefix(12)) { repo in
+                ForEach(Array(sortedEngineering.prefix(12).enumerated()), id: \.element.id) { index, repo in
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 3) {
                             Text(repo.repository).font(.subheadline.weight(.semibold))
@@ -206,7 +210,7 @@ struct AnalyticsView: View {
                             .foregroundStyle(ciTint(repo.workflowSuccessRate))
                     }
                     .padding(.vertical, 10)
-                    if repo.id != model.repositoryAnalytics.values.sorted(by: { $0.repository < $1.repository }).last?.id {
+                    if index < min(sortedEngineering.count, 12) - 1 {
                         Divider().opacity(0.2)
                     }
                 }
