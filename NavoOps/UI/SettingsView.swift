@@ -10,11 +10,13 @@ struct SettingsView: View {
     @State private var notificationStatus = ""
     @State private var showResetConfirmation = false
     @State private var showHistoryResetConfirmation = false
+    @State private var showAnalyticsHistoryResetConfirmation = false
 
     var body: some View {
         Form {
             githubSection
             storeBridgeSection
+            analyticsBridgeSection
             intelligenceSection
             securitySection
             notificationsSection
@@ -30,9 +32,7 @@ struct SettingsView: View {
             isPresented: $showResetConfirmation,
             titleVisibility: .visible
         ) {
-            Button(L10n.t("Zurücksetzen", "Reset"), role: .destructive) {
-                model.resetPortfolio()
-            }
+            Button(L10n.t("Zurücksetzen", "Reset"), role: .destructive) { model.resetPortfolio() }
             Button(L10n.t("Abbrechen", "Cancel"), role: .cancel) {}
         }
         .confirmationDialog(
@@ -40,14 +40,25 @@ struct SettingsView: View {
             isPresented: $showHistoryResetConfirmation,
             titleVisibility: .visible
         ) {
-            Button(L10n.t("Verlauf löschen", "Delete history"), role: .destructive) {
-                model.resetStoreHistory()
-            }
+            Button(L10n.t("Verlauf löschen", "Delete history"), role: .destructive) { model.resetStoreHistory() }
             Button(L10n.t("Abbrechen", "Cancel"), role: .cancel) {}
         } message: {
             Text(L10n.t(
                 "Dadurch gehen nur die lokal beobachteten Status- und Versionswechsel verloren. Live-Store-Daten werden nicht verändert.",
                 "This only removes locally observed state and version transitions. Live store data is not changed."
+            ))
+        }
+        .confirmationDialog(
+            L10n.t("Lokalen Analytics-Verlauf löschen?", "Delete local analytics history?"),
+            isPresented: $showAnalyticsHistoryResetConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(L10n.t("Analytics-Verlauf löschen", "Delete analytics history"), role: .destructive) { model.resetAnalyticsHistory() }
+            Button(L10n.t("Abbrechen", "Cancel"), role: .cancel) {}
+        } message: {
+            Text(L10n.t(
+                "Nur die lokal gespeicherten historischen Messpunkte werden entfernt. Bridge- und Store-Daten bleiben unverändert.",
+                "Only locally stored historical measurement points are removed. Bridge and store data remain unchanged."
             ))
         }
     }
@@ -80,7 +91,9 @@ struct SettingsView: View {
                 model.pullRequests = []
                 model.issues = []
                 model.healthByRepository = [:]
+                model.repositoryAnalytics = [:]
                 model.storeFeed = nil
+                model.analyticsFeed = nil
             }
 
             Text(L10n.t(
@@ -158,6 +171,72 @@ struct SettingsView: View {
         .listRowBackground(NavoTheme.surface)
     }
 
+    private var analyticsBridgeSection: some View {
+        Section(L10n.t("Analytics Bridge", "Analytics Bridge")) {
+            LabeledContent("App Store Connect") {
+                Label(
+                    model.analyticsFeed?.appleAvailable == true ? "Live" : L10n.t("Nicht verfügbar", "Unavailable"),
+                    systemImage: model.analyticsFeed?.appleAvailable == true ? "checkmark.circle.fill" : "minus.circle"
+                )
+                .foregroundStyle(model.analyticsFeed?.appleAvailable == true ? NavoTheme.success : .secondary)
+            }
+
+            if let date = model.analyticsFeed?.appleGeneratedAt {
+                LabeledContent(L10n.t("Apple Analytics", "Apple analytics"), value: date.formatted(date: .abbreviated, time: .shortened))
+            }
+
+            LabeledContent("Google Play") {
+                Label(
+                    model.analyticsFeed?.googleAvailable == true ? "Live" : L10n.t("Nicht verfügbar", "Unavailable"),
+                    systemImage: model.analyticsFeed?.googleAvailable == true ? "checkmark.circle.fill" : "minus.circle"
+                )
+                .foregroundStyle(model.analyticsFeed?.googleAvailable == true ? NavoTheme.success : .secondary)
+            }
+
+            if let date = model.analyticsFeed?.googleGeneratedAt {
+                LabeledContent(L10n.t("Google Analytics", "Google analytics"), value: date.formatted(date: .abbreviated, time: .shortened))
+            }
+
+            LabeledContent(L10n.t("Kommerzielle Daten", "Commercial data"), value: model.analyticsFeed?.commercialAvailable == true ? L10n.t("Verfügbar", "Available") : "–")
+            LabeledContent(L10n.t("Reliability / Vitals", "Reliability / Vitals"), value: model.analyticsFeed?.reliabilityAvailable == true ? L10n.t("Verfügbar", "Available") : "–")
+            LabeledContent(L10n.t("Historische Messpunkte", "Historical data points"), value: "\(model.analyticsHistory.count)")
+
+            NavigationLink {
+                AnalyticsView()
+            } label: {
+                Label(L10n.t("Business & Release Intelligence öffnen", "Open Business & Release Intelligence"), systemImage: "chart.line.uptrend.xyaxis")
+            }
+
+            Button {
+                Task { await model.refreshAnalytics() }
+            } label: {
+                Label(L10n.t("Analytics laden", "Load analytics"), systemImage: "arrow.down.circle.fill")
+            }
+            .disabled(model.isRefreshingAnalytics || KeychainStore.githubToken == nil)
+
+            Button {
+                Task { await model.requestAnalyticsBridgeRefresh() }
+            } label: {
+                Label(L10n.t("Analytics-Bridges aktualisieren", "Refresh analytics bridges"), systemImage: "bolt.horizontal.circle.fill")
+            }
+            .disabled(KeychainStore.githubToken == nil)
+
+            if let error = model.analyticsErrorMessage, !error.isEmpty {
+                Label(error, systemImage: "exclamationmark.triangle.fill")
+                    .font(.footnote)
+                    .foregroundStyle(NavoTheme.warning)
+            }
+
+            Text(L10n.t(
+                "Kommerzielle Kennzahlen und Vitals werden nur angezeigt, wenn die jeweilige Apple-/Google-Reportingquelle sie tatsächlich liefert. Fehlende Werte bleiben leer.",
+                "Commercial metrics and Vitals are only shown when the respective Apple/Google reporting source actually provides them. Missing values remain empty."
+            ))
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+        }
+        .listRowBackground(NavoTheme.surface)
+    }
+
     private var intelligenceSection: some View {
         let intelligence = model.intelligence
         return Section(L10n.t("Ops Intelligence", "Ops Intelligence")) {
@@ -189,9 +268,7 @@ struct SettingsView: View {
                 L10n.t("Mit Face ID / Gerätecode sperren", "Lock with Face ID / device passcode"),
                 isOn: Binding(
                     get: { security.lockEnabled },
-                    set: { enabled in
-                        Task { await security.setLockEnabled(enabled) }
-                    }
+                    set: { enabled in Task { await security.setLockEnabled(enabled) } }
                 )
             )
             .disabled(!security.canUseDeviceAuthentication && !security.lockEnabled)
@@ -261,12 +338,17 @@ struct SettingsView: View {
             } label: {
                 Label(L10n.t("Alles synchronisieren", "Sync everything"), systemImage: "arrow.clockwise")
             }
-            .disabled(model.isRefreshing || model.isRefreshingStores || KeychainStore.githubToken == nil)
+            .disabled(model.isRefreshing || model.isRefreshingStores || model.isRefreshingAnalytics || KeychainStore.githubToken == nil)
 
             Button(L10n.t("Store-Verlauf löschen", "Delete store history"), role: .destructive) {
                 showHistoryResetConfirmation = true
             }
             .disabled(model.storeHistory.isEmpty)
+
+            Button(L10n.t("Analytics-Verlauf löschen", "Delete analytics history"), role: .destructive) {
+                showAnalyticsHistoryResetConfirmation = true
+            }
+            .disabled(model.analyticsHistory.isEmpty)
 
             Button(L10n.t("Portfolio zurücksetzen", "Reset portfolio"), role: .destructive) {
                 showResetConfirmation = true
@@ -276,8 +358,8 @@ struct SettingsView: View {
     }
 
     private var appVersion: String {
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.2"
-        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "3"
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.3"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "4"
         return "\(version) (\(build))"
     }
 
