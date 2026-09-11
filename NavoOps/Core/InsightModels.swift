@@ -15,6 +15,7 @@ struct OpsInsight: Identifiable, Hashable {
     enum Kind: Hashable {
         case build
         case store
+        case release
         case parity
         case readiness
         case freshness
