@@ -1,6 +1,7 @@
 import SwiftUI
 
 @main
+@MainActor
 struct NavoOpsApp: App {
     @StateObject private var appModel = AppModel()
     @StateObject private var security = SecurityService()
