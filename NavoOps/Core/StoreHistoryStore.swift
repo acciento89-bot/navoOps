@@ -22,11 +22,11 @@ struct StoreHistoryStore {
 
     func record(feed: StoreStatusFeed, products: [ProductApp], existing: [StoreHistoryEvent]) -> [StoreHistoryEvent] {
         var events = prune(existing)
-        let observedAt = feed.generatedAt
 
         for snapshot in feed.apps {
             guard let product = products.first(where: snapshot.matches) else { continue }
 
+            let observedAt = observationDate(for: snapshot.provider, feed: feed)
             let previous = events
                 .filter { $0.productID == product.id && $0.provider == snapshot.provider }
                 .max(by: { $0.observedAt < $1.observedAt })
@@ -66,6 +66,15 @@ struct StoreHistoryStore {
 
     func reset() {
         defaults.removeObject(forKey: key)
+    }
+
+    private func observationDate(for provider: StoreProvider, feed: StoreStatusFeed) -> Date {
+        switch provider {
+        case .apple:
+            return feed.appleGeneratedAt ?? feed.generatedAt
+        case .google:
+            return feed.googleGeneratedAt ?? feed.generatedAt
+        }
     }
 
     private func save(_ events: [StoreHistoryEvent]) {
