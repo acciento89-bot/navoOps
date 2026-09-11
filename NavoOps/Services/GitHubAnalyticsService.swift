@@ -16,6 +16,8 @@ struct GitHubAnalyticsService: Sendable {
     }
 
     private let owner = "acciento89-bot"
+    private let pageSize = 100
+    private let maximumPages = 10
 
     func fetch(repositories: [String]) async -> [String: RepositoryAnalytics] {
         guard KeychainStore.githubToken?.isEmpty == false else { return [:] }
@@ -62,43 +64,73 @@ struct GitHubAnalyticsService: Sendable {
 
     private func fetchCommitCount(repository: String, since: Date) async throws -> Int {
         let iso = ISO8601DateFormatter().string(from: since)
-        let url = try makeURL(path: "/repos/\(owner)/\(repository)/commits", query: [
-            URLQueryItem(name: "since", value: iso),
-            URLQueryItem(name: "per_page", value: "100")
-        ])
-        let data = try await request(url)
-        return (try? JSONSerialization.jsonObject(with: data) as? [[String: Any]])?.count ?? 0
+        var count = 0
+
+        for page in 1...maximumPages {
+            let url = try makeURL(path: "/repos/\(owner)/\(repository)/commits", query: [
+                URLQueryItem(name: "since", value: iso),
+                URLQueryItem(name: "per_page", value: String(pageSize)),
+                URLQueryItem(name: "page", value: String(page))
+            ])
+            let data = try await request(url)
+            let items = (try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]) ?? []
+            count += items.count
+            if items.count < pageSize { break }
+        }
+        return count
     }
 
     private func fetchWorkflowStats(repository: String, since: Date) async throws -> (Int, Int, Int) {
-        let url = try makeURL(path: "/repos/\(owner)/\(repository)/actions/runs", query: [
-            URLQueryItem(name: "per_page", value: "100")
-        ])
-        let data = try await request(url)
-        let payload = try JSONDecoder.github.decode(WorkflowAnalyticsResponse.self, from: data)
-        let runs = payload.workflow_runs.filter { ($0.updated_at ?? .distantPast) >= since }
-        let completed = runs.filter { $0.status == "completed" }
-        let success = completed.filter { $0.conclusion == "success" }.count
+        var completedCount = 0
+        var successCount = 0
+        var failureCount = 0
         let failureConclusions: Set<String> = ["failure", "cancelled", "timed_out", "action_required", "startup_failure", "stale"]
-        let failure = completed.filter { $0.conclusion.map(failureConclusions.contains) == true }.count
-        return (completed.count, success, failure)
+
+        for page in 1...maximumPages {
+            let url = try makeURL(path: "/repos/\(owner)/\(repository)/actions/runs", query: [
+                URLQueryItem(name: "per_page", value: String(pageSize)),
+                URLQueryItem(name: "page", value: String(page))
+            ])
+            let data = try await request(url)
+            let payload = try JSONDecoder.github.decode(WorkflowAnalyticsResponse.self, from: data)
+            if payload.workflow_runs.isEmpty { break }
+
+            let inWindow = payload.workflow_runs.filter { ($0.updated_at ?? .distantPast) >= since }
+            let completed = inWindow.filter { $0.status == "completed" }
+            completedCount += completed.count
+            successCount += completed.filter { $0.conclusion == "success" }.count
+            failureCount += completed.filter { $0.conclusion.map(failureConclusions.contains) == true }.count
+
+            let reachedOlderData = payload.workflow_runs.contains { ($0.updated_at ?? .distantPast) < since }
+            if payload.workflow_runs.count < pageSize || reachedOlderData { break }
+        }
+
+        return (completedCount, successCount, failureCount)
     }
 
     private func fetchMergedPRCounts(since: Date) async throws -> [String: Int] {
         let date = Self.dateOnly.string(from: since)
         let query = "user:\(owner) is:pr is:merged merged:>=\(date)"
-        let url = try makeURL(path: "/search/issues", query: [
-            URLQueryItem(name: "q", value: query),
-            URLQueryItem(name: "per_page", value: "100"),
-            URLQueryItem(name: "sort", value: "updated")
-        ])
-        let data = try await request(url)
-        let payload = try JSONDecoder.github.decode(MergedPRSearchResponse.self, from: data)
         var counts: [String: Int] = [:]
-        for item in payload.items {
-            let components = item.repository_url.split(separator: "/")
-            guard let repository = components.last.map(String.init) else { continue }
-            counts[repository, default: 0] += 1
+
+        for page in 1...maximumPages {
+            let url = try makeURL(path: "/search/issues", query: [
+                URLQueryItem(name: "q", value: query),
+                URLQueryItem(name: "per_page", value: String(pageSize)),
+                URLQueryItem(name: "page", value: String(page)),
+                URLQueryItem(name: "sort", value: "updated"),
+                URLQueryItem(name: "order", value: "desc")
+            ])
+            let data = try await request(url)
+            let payload = try JSONDecoder.github.decode(MergedPRSearchResponse.self, from: data)
+
+            for item in payload.items {
+                let components = item.repository_url.split(separator: "/")
+                guard let repository = components.last.map(String.init) else { continue }
+                counts[repository, default: 0] += 1
+            }
+
+            if payload.items.count < pageSize || page * pageSize >= min(payload.total_count, 1000) { break }
         }
         return counts
     }
@@ -145,6 +177,7 @@ private struct WorkflowAnalyticsRun: Decodable {
 }
 
 private struct MergedPRSearchResponse: Decodable {
+    let total_count: Int
     let items: [MergedPRSearchItem]
 }
 
