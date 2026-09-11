@@ -9,7 +9,7 @@ extension AppModel {
         let score = max(0, 100 - min(36, critical * 12) - min(30, actions * 6) - min(14, warnings * 2))
 
         let dualPlatform = products.filter { $0.supportsApple && $0.supportsGoogle }
-        let aligned = dualPlatform.filter(isCrossPlatformAligned).count
+        let aligned = dualPlatform.filter { isCrossPlatformAligned($0) }.count
         let unhealthyIDs = Set(insights.compactMap { insight -> String? in
             guard insight.severity != .info else { return nil }
             return insight.productID
@@ -42,10 +42,10 @@ extension AppModel {
 
     var productIntelligence: [ProductIntelligenceSnapshot] {
         products.map { product in
-            let insights = insights(for: product)
-            let critical = insights.filter { $0.severity == .critical }.count
-            let actions = insights.filter { $0.severity == .action }.count
-            let warnings = insights.filter { $0.severity == .warning }.count
+            let productInsights = insights(for: product)
+            let critical = productInsights.filter { $0.severity == .critical }.count
+            let actions = productInsights.filter { $0.severity == .action }.count
+            let warnings = productInsights.filter { $0.severity == .warning }.count
             let score = max(0, 100 - critical * 25 - actions * 12 - warnings * 5)
             return .init(
                 product: product,
@@ -53,7 +53,7 @@ extension AppModel {
                 google: storeSnapshot(for: product, provider: .google),
                 health: health(for: product),
                 score: score,
-                insightCount: insights.filter { $0.severity != .info }.count,
+                insightCount: productInsights.filter { $0.severity != .info }.count,
                 isAligned: isCrossPlatformAligned(product)
             )
         }
@@ -129,7 +129,7 @@ extension AppModel {
                 severity: .warning,
                 kind: .inventory,
                 provider: .apple,
-                date: storeGeneratedAt
+                date: generatedAt(for: .apple)
             ))
         }
 
@@ -143,7 +143,7 @@ extension AppModel {
                 severity: .warning,
                 kind: .inventory,
                 provider: .google,
-                date: storeGeneratedAt
+                date: generatedAt(for: .google)
             ))
         }
 
@@ -220,18 +220,18 @@ extension AppModel {
             ))
         }
 
-        let openPRs = pullRequests(for: product).count
-        if openPRs > 0 {
+        let productPRs = pullRequests(for: product)
+        if !productPRs.isEmpty {
             result.append(.init(
-                id: "\(product.id):prs:\(openPRs)",
+                id: "\(product.id):prs:\(productPRs.count)",
                 productID: product.id,
-                title: L10n.t("\(openPRs) offene PRs · \(product.name)", "\(openPRs) open PRs · \(product.name)"),
+                title: L10n.t("\(productPRs.count) offene PRs · \(product.name)", "\(productPRs.count) open PRs · \(product.name)"),
                 detail: L10n.t("Noch nicht gemergte Änderungen können den nächsten Release beeinflussen.", "Unmerged changes may affect the next release."),
                 recommendation: L10n.t("PRs vor Release-Freigabe prüfen.", "Review PRs before approving the next release."),
                 severity: .info,
                 kind: .github,
                 provider: nil,
-                date: pullRequests(for: product).compactMap(\.updatedAt).max()
+                date: productPRs.compactMap(\.updatedAt).max()
             ))
         }
 
@@ -259,14 +259,19 @@ extension AppModel {
             .sorted { $0.observedAt < $1.observedAt }
         guard !matching.isEmpty else { return nil }
 
-        var start = matching.first?.observedAt
+        var start: Date?
         for event in matching {
             if event.state == current.state {
-                start = event.observedAt
-            } else if event.observedAt > (start ?? .distantPast) {
+                if event.previousState == nil || event.previousState != current.state {
+                    start = event.observedAt
+                } else if start == nil {
+                    start = event.observedAt
+                }
+            } else {
                 start = nil
             }
         }
+
         guard let start else { return nil }
         return max(0, Date().timeIntervalSince(start))
     }
@@ -282,8 +287,31 @@ extension AppModel {
         return components.prefix(3).joined(separator: ".")
     }
 
+    func generatedAt(for provider: StoreProvider) -> Date? {
+        switch provider {
+        case .apple:
+            return storeFeed?.appleGeneratedAt ?? (appleLiveAvailable ? storeFeed?.generatedAt : nil)
+        case .google:
+            return storeFeed?.googleGeneratedAt ?? (googleLiveAvailable ? storeFeed?.generatedAt : nil)
+        }
+    }
+
     private var systemInsights: [OpsInsight] {
         var result: [OpsInsight] = []
+
+        guard storeFeed != nil else {
+            return [.init(
+                id: "system:no-store-snapshot",
+                productID: nil,
+                title: L10n.t("Noch kein Live-Snapshot geladen", "No live snapshot loaded yet"),
+                detail: L10n.t("Ops Intelligence bewertet Store-Risiken nach der ersten Synchronisierung.", "Ops Intelligence evaluates store risks after the first sync."),
+                recommendation: L10n.t("NavoOps synchronisieren.", "Sync NavoOps."),
+                severity: .info,
+                kind: .freshness,
+                provider: nil,
+                date: nil
+            )]
+        }
 
         if !appleLiveAvailable {
             result.append(.init(
@@ -295,8 +323,10 @@ extension AppModel {
                 severity: .action,
                 kind: .freshness,
                 provider: .apple,
-                date: storeGeneratedAt
+                date: generatedAt(for: .apple)
             ))
+        } else {
+            appendFreshnessInsight(provider: .apple, into: &result)
         }
 
         if !googleLiveAvailable {
@@ -309,37 +339,10 @@ extension AppModel {
                 severity: .action,
                 kind: .freshness,
                 provider: .google,
-                date: storeGeneratedAt
+                date: generatedAt(for: .google)
             ))
-        }
-
-        if let generatedAt = storeGeneratedAt {
-            let age = Date().timeIntervalSince(generatedAt)
-            if age > 3 * 60 * 60 {
-                result.append(.init(
-                    id: "system:stale-store-feed",
-                    productID: nil,
-                    title: L10n.t("Store-Daten veraltet", "Store data stale"),
-                    detail: L10n.t("Letzter Store-Snapshot ist älter als 3 Stunden.", "The latest store snapshot is more than 3 hours old."),
-                    recommendation: L10n.t("Bridge-Refresh auslösen und Feed prüfen.", "Trigger a bridge refresh and verify the feed."),
-                    severity: .critical,
-                    kind: .freshness,
-                    provider: nil,
-                    date: generatedAt
-                ))
-            } else if age > 90 * 60 {
-                result.append(.init(
-                    id: "system:aging-store-feed",
-                    productID: nil,
-                    title: L10n.t("Store-Snapshot wird alt", "Store snapshot aging"),
-                    detail: L10n.t("Der letzte Snapshot ist älter als 90 Minuten.", "The latest snapshot is more than 90 minutes old."),
-                    recommendation: L10n.t("Bei Bedarf einen manuellen Bridge-Refresh starten.", "Trigger a manual bridge refresh if needed."),
-                    severity: .warning,
-                    kind: .freshness,
-                    provider: nil,
-                    date: generatedAt
-                ))
-            }
+        } else {
+            appendFreshnessInsight(provider: .google, into: &result)
         }
 
         if !untrackedStoreApps.isEmpty {
@@ -359,6 +362,38 @@ extension AppModel {
         return result
     }
 
+    private func appendFreshnessInsight(provider: StoreProvider, into result: inout [OpsInsight]) {
+        guard let generatedAt = generatedAt(for: provider) else { return }
+        let age = Date().timeIntervalSince(generatedAt)
+        let storeName = provider.title
+
+        if age > 3 * 60 * 60 {
+            result.append(.init(
+                id: "system:\(provider.rawValue):stale",
+                productID: nil,
+                title: L10n.t("\(storeName)-Daten veraltet", "\(storeName) data stale"),
+                detail: L10n.t("Der letzte Snapshot ist älter als 3 Stunden.", "The latest snapshot is more than 3 hours old."),
+                recommendation: L10n.t("Bridge-Refresh auslösen und Quelle prüfen.", "Trigger a bridge refresh and verify the source."),
+                severity: .critical,
+                kind: .freshness,
+                provider: provider,
+                date: generatedAt
+            ))
+        } else if age > 90 * 60 {
+            result.append(.init(
+                id: "system:\(provider.rawValue):aging",
+                productID: nil,
+                title: L10n.t("\(storeName)-Snapshot wird alt", "\(storeName) snapshot aging"),
+                detail: L10n.t("Der letzte Snapshot ist älter als 90 Minuten.", "The latest snapshot is more than 90 minutes old."),
+                recommendation: L10n.t("Bei Bedarf einen manuellen Bridge-Refresh starten.", "Trigger a manual bridge refresh if needed."),
+                severity: .warning,
+                kind: .freshness,
+                provider: provider,
+                date: generatedAt
+            ))
+        }
+    }
+
     private func appendStoreInsight(
         snapshot: StoreAppSnapshot?,
         product: ProductApp,
@@ -367,6 +402,7 @@ extension AppModel {
     ) {
         guard let snapshot else { return }
         let storeName = provider.title
+        let sourceDate = generatedAt(for: provider) ?? storeGeneratedAt
 
         switch snapshot.state {
         case .rejected:
@@ -379,7 +415,7 @@ extension AppModel {
                 severity: .critical,
                 kind: .store,
                 provider: provider,
-                date: snapshot.updatedAt ?? storeGeneratedAt
+                date: snapshot.updatedAt ?? sourceDate
             ))
         case .attention:
             result.append(.init(
@@ -391,23 +427,57 @@ extension AppModel {
                 severity: .action,
                 kind: .store,
                 provider: provider,
-                date: snapshot.updatedAt ?? storeGeneratedAt
+                date: snapshot.updatedAt ?? sourceDate
             ))
         case .review, .processing:
             let duration = observedStateDuration(for: product, provider: provider)
             let durationText = duration.map(formatDuration) ?? L10n.t("seit erstem beobachteten Snapshot", "since the first observed snapshot")
+            let severity: OpsInsight.Severity = (duration ?? 0) > 72 * 60 * 60 ? .warning : .info
+            let recommendation = severity == .warning
+                ? L10n.t("Status ist ungewöhnlich lange unverändert; Store-Portal auf neue Hinweise prüfen.", "Status has been unchanged for an unusually long time; check the store portal for new notices.")
+                : L10n.t("Kein Eingriff nötig, solange keine neue Store-Aktion angefordert wird.", "No action needed unless the store requests another step.")
             result.append(.init(
                 id: "\(product.id):\(provider.rawValue):waiting:\(snapshot.state.rawValue)",
                 productID: product.id,
                 title: L10n.t("\(storeName) in Bearbeitung · \(product.name)", "\(storeName) processing · \(product.name)"),
                 detail: L10n.t("Status beobachtet: \(durationText)", "Observed status: \(durationText)"),
-                recommendation: L10n.t("Kein Eingriff nötig, solange keine neue Store-Aktion angefordert wird.", "No action needed unless the store requests another step."),
-                severity: .info,
+                recommendation: recommendation,
+                severity: severity,
                 kind: .store,
                 provider: provider,
-                date: snapshot.updatedAt ?? storeGeneratedAt
+                date: snapshot.updatedAt ?? sourceDate
             ))
-        case .development, .internalTest, .live, .unavailable:
+        case .internalTest:
+            let ready = provider == .apple ? product.checklist.readyForApple : product.checklist.readyForGoogle
+            if ready {
+                result.append(.init(
+                    id: "\(product.id):\(provider.rawValue):internal-ready",
+                    productID: product.id,
+                    title: L10n.t("\(storeName) intern bereit · \(product.name)", "\(storeName) internal build ready · \(product.name)"),
+                    detail: snapshot.detail ?? snapshot.rawState,
+                    recommendation: L10n.t("Wenn der interne Test passt, Production/Review als nächsten Release-Schritt vorbereiten.", "If internal testing is good, prepare Production/Review as the next release step."),
+                    severity: .action,
+                    kind: .store,
+                    provider: provider,
+                    date: snapshot.updatedAt ?? sourceDate
+                ))
+            }
+        case .development:
+            let ready = provider == .apple ? product.checklist.readyForApple : product.checklist.readyForGoogle
+            if ready {
+                result.append(.init(
+                    id: "\(product.id):\(provider.rawValue):ready-to-submit",
+                    productID: product.id,
+                    title: L10n.t("\(storeName) submit-bereit · \(product.name)", "\(storeName) ready to submit · \(product.name)"),
+                    detail: snapshot.detail ?? snapshot.rawState,
+                    recommendation: L10n.t("Readiness ist vollständig; den Store-Release prüfen und zur Prüfung senden.", "Readiness is complete; review the store release and submit it for review."),
+                    severity: .action,
+                    kind: .release,
+                    provider: provider,
+                    date: snapshot.updatedAt ?? sourceDate
+                ))
+            }
+        case .live, .unavailable:
             break
         }
     }
