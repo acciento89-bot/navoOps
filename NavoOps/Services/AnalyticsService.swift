@@ -31,12 +31,12 @@ struct AnalyticsService: Sendable {
     private let appleBridge = Bridge(
         repository: "onemorefloor",
         feedPath: "generated/navoops/apple-analytics.json",
-        workflowFile: "navoops-store-feed.yml"
+        workflowFile: "navoops-apple-analytics.yml"
     )
     private let googleBridge = Bridge(
         repository: "maengelfix",
         feedPath: "generated/navoops/google-analytics.json",
-        workflowFile: "navoops-google-store-feed.yml"
+        workflowFile: "navoops-google-analytics.yml"
     )
 
     func fetchFeed() async throws -> AnalyticsFeed {
