@@ -10,6 +10,7 @@ final class AppModel: ObservableObject {
     @Published var healthByRepository: [String: RepositoryHealth] = [:]
     @Published var activities: [ActivityItem] = []
     @Published var storeFeed: StoreStatusFeed?
+    @Published var storeHistory: [StoreHistoryEvent] = []
     @Published var isRefreshing = false
     @Published var isRefreshingStores = false
     @Published var lastRefresh: Date?
@@ -20,9 +21,11 @@ final class AppModel: ObservableObject {
     private let github = GitHubService()
     private let storeStatus = StoreStatusService()
     private let portfolioStore = PortfolioStore()
+    private let storeHistoryStore = StoreHistoryStore()
 
     init() {
         products = portfolioStore.loadMerged(with: ProductCatalog.seed)
+        storeHistory = storeHistoryStore.load()
     }
 
     var fullyLiveCount: Int {
@@ -221,6 +224,7 @@ final class AppModel: ObservableObject {
         do {
             let feed = try await storeStatus.fetchFeed()
             storeFeed = feed
+            storeHistory = storeHistoryStore.record(feed: feed, products: products, existing: storeHistory)
             storeErrorMessage = nil
             storeRefreshRequested = false
             await NotificationService.shared.processStoreFeed(feed)
@@ -249,6 +253,11 @@ final class AppModel: ObservableObject {
         portfolioStore.reset()
         products = ProductCatalog.seed
         portfolioStore.save(products)
+    }
+
+    func resetStoreHistory() {
+        storeHistoryStore.reset()
+        storeHistory = []
     }
 
     func createIssue(for product: ProductApp, title: String, body: String) async throws -> IssueSnapshot {

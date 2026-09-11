@@ -19,6 +19,28 @@ struct StoreStatusFeed: Codable, Hashable {
     let appleAvailable: Bool
     let googleAvailable: Bool
     let apps: [StoreAppSnapshot]
+    let appleGeneratedAt: Date?
+    let googleGeneratedAt: Date?
+
+    init(
+        schemaVersion: Int,
+        generatedAt: Date,
+        sourceRepository: String?,
+        appleAvailable: Bool,
+        googleAvailable: Bool,
+        apps: [StoreAppSnapshot],
+        appleGeneratedAt: Date? = nil,
+        googleGeneratedAt: Date? = nil
+    ) {
+        self.schemaVersion = schemaVersion
+        self.generatedAt = generatedAt
+        self.sourceRepository = sourceRepository
+        self.appleAvailable = appleAvailable
+        self.googleAvailable = googleAvailable
+        self.apps = apps
+        self.appleGeneratedAt = appleGeneratedAt
+        self.googleGeneratedAt = googleGeneratedAt
+    }
 }
 
 struct StoreAppSnapshot: Identifiable, Codable, Hashable {
@@ -115,9 +137,6 @@ extension StoreAppSnapshot {
     }
 
     private static func normalize(_ value: String) -> String {
-        // Store metadata may transliterate German umlauts (for example
-        // "WärmeTakt" -> "waerme takt"). Expand those characters before
-        // removing diacritics so both spellings resolve to the same key.
         var normalized = value.lowercased(with: Locale(identifier: "de_DE"))
         normalized = normalized
             .replacingOccurrences(of: "ä", with: "ae")
