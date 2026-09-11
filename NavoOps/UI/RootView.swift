@@ -47,10 +47,13 @@ private struct ProductRouteView: View {
         if let product = model.products.first(where: { $0.id == productID }) {
             ProductDetailView(product: product)
         } else {
-            ContentUnavailableView(
-                L10n.t("App nicht gefunden", "App not found"),
-                systemImage: "questionmark.app"
-            )
+            ContentUnavailableView {
+                Label {
+                    Text(L10n.t("App nicht gefunden", "App not found"))
+                } icon: {
+                    Image(systemName: "questionmark.app")
+                }
+            }
         }
     }
 }
