@@ -2,8 +2,12 @@ name: iOS CI
 
 on:
   push:
-    branches: [main, feature/**]
+    branches: [main]
   pull_request:
+
+concurrency:
+  group: ios-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-and-test:
@@ -24,7 +28,12 @@ jobs:
       - name: Verify opaque 1024px app icon
         run: |
           test -s NavoOps/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png
-          sips -g pixelWidth -g pixelHeight -g hasAlpha NavoOps/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png
+          WIDTH=$(sips -g pixelWidth NavoOps/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png | awk '/pixelWidth/ {print $2}')
+          HEIGHT=$(sips -g pixelHeight NavoOps/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png | awk '/pixelHeight/ {print $2}')
+          ALPHA=$(sips -g hasAlpha NavoOps/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png | awk '/hasAlpha/ {print $2}')
+          test "$WIDTH" = "1024"
+          test "$HEIGHT" = "1024"
+          test "$ALPHA" = "no"
 
       - name: Generate Xcode project
         run: xcodegen generate
