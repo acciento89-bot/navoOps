@@ -14,8 +14,8 @@ struct RootView: View {
             productNavigation { ReleaseCenterView() }
                 .tabItem { Label(L10n.t("Releases", "Releases"), systemImage: "shippingbox.fill") }
 
-            NavigationStack { GitHubView() }
-                .tabItem { Label("GitHub", systemImage: "point.3.connected.trianglepath.dotted") }
+            productNavigation { AnalyticsView() }
+                .tabItem { Label(L10n.t("Analytics", "Analytics"), systemImage: "chart.line.uptrend.xyaxis") }
 
             NavigationStack { SettingsView() }
                 .tabItem { Label(L10n.t("Einstellungen", "Settings"), systemImage: "gearshape.fill") }
