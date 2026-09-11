@@ -126,4 +126,72 @@ final class ModelsTests: XCTestCase {
         XCTAssertEqual(feed.apps.first?.appName, "NavoOps")
         XCTAssertEqual(feed.apps.first?.state, .development)
     }
+
+    func testStoreFeedDecodesOffsetRFC3339Date() throws {
+        let json = """
+        {
+          "schemaVersion": 1,
+          "generatedAt": "2026-09-11T16:20:31Z",
+          "sourceRepository": "acciento89-bot/onemorefloor",
+          "appleAvailable": true,
+          "googleAvailable": false,
+          "apps": [{
+            "provider": "apple",
+            "appName": "NavoKids – Lerninseln",
+            "externalID": "6809038305",
+            "bundleOrPackageID": "com.kamilunavo.navokids",
+            "version": "0.4.0",
+            "build": "13",
+            "rawState": "IN_REVIEW",
+            "state": "review",
+            "updatedAt": "2026-09-10T14:36:14-07:00",
+            "detail": "IN_REVIEW"
+          }]
+        }
+        """
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let feed = try decoder.decode(StoreStatusFeed.self, from: Data(json.utf8))
+        XCTAssertNotNil(feed.apps.first?.updatedAt)
+        XCTAssertEqual(feed.apps.first?.state, .review)
+    }
+
+    func testPortfolioMigrationAddsCanonicalIdentifiersWithoutOverwritingManualState() throws {
+        let suiteName = "NavoOpsTests.PortfolioMigration.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            return XCTFail("Could not create isolated defaults suite")
+        }
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        var legacy = ProductApp(
+            id: "navokids",
+            name: "NavoKids",
+            repository: "navokids",
+            platforms: [.iOS],
+            appleState: .attention,
+            googleState: .development,
+            version: "0.3.0",
+            build: "7",
+            notes: "keep my manual note",
+            checklist: .init(icon: true),
+            storeInfo: .init(appleBundleID: nil, androidPackageID: nil),
+            monetization: .mixed,
+            tags: ["Manual"]
+        )
+        legacy.storeInfo.privacyURL = nil
+
+        let data = try JSONEncoder().encode([legacy])
+        defaults.set(data, forKey: "navoops.portfolio.v1")
+
+        let store = PortfolioStore(defaults: defaults)
+        let migrated = try XCTUnwrap(store.loadMerged(with: ProductCatalog.seed).first { $0.id == "navokids" })
+        XCTAssertEqual(migrated.appleState, .attention)
+        XCTAssertEqual(migrated.notes, "keep my manual note")
+        XCTAssertEqual(migrated.storeInfo.appleBundleID, "com.kamilunavo.navokids")
+        XCTAssertEqual(migrated.storeInfo.androidPackageID, "com.kamilunavo.navokids")
+        XCTAssertTrue(migrated.platforms.contains(.android))
+        XCTAssertTrue(migrated.tags.contains("Manual"))
+        XCTAssertTrue(migrated.tags.contains("Education"))
+        XCTAssertNotNil(migrated.storeInfo.privacyURL)
+    }
 }
