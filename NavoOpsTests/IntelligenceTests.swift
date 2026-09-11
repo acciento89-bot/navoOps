@@ -21,14 +21,16 @@ final class IntelligenceTests: XCTestCase {
             build: "1",
             storeInfo: .init(appleBundleID: "com.kamilunavo.sample")
         )
+        let base = Date()
 
         let initial = StoreStatusFeed(
             schemaVersion: 1,
-            generatedAt: Date(timeIntervalSince1970: 100),
+            generatedAt: base.addingTimeInterval(-300),
             sourceRepository: "test",
             appleAvailable: true,
             googleAvailable: false,
-            apps: [snapshot(state: .review, version: "1.0.0", build: "1")]
+            apps: [snapshot(state: .review, version: "1.0.0", build: "1")],
+            appleGeneratedAt: base.addingTimeInterval(-300)
         )
         var events = store.record(feed: initial, products: [product], existing: [])
         XCTAssertEqual(events.count, 1)
@@ -36,28 +38,80 @@ final class IntelligenceTests: XCTestCase {
 
         let unchanged = StoreStatusFeed(
             schemaVersion: 1,
-            generatedAt: Date(timeIntervalSince1970: 200),
+            generatedAt: base.addingTimeInterval(-200),
             sourceRepository: "test",
             appleAvailable: true,
             googleAvailable: false,
-            apps: [snapshot(state: .review, version: "1.0.0", build: "1")]
+            apps: [snapshot(state: .review, version: "1.0.0", build: "1")],
+            appleGeneratedAt: base.addingTimeInterval(-200)
         )
         events = store.record(feed: unchanged, products: [product], existing: events)
         XCTAssertEqual(events.count, 1)
 
         let changed = StoreStatusFeed(
             schemaVersion: 1,
-            generatedAt: Date(timeIntervalSince1970: 300),
+            generatedAt: base.addingTimeInterval(-100),
             sourceRepository: "test",
             appleAvailable: true,
             googleAvailable: false,
-            apps: [snapshot(state: .live, version: "1.0.0", build: "1")]
+            apps: [snapshot(state: .live, version: "1.0.0", build: "1")],
+            appleGeneratedAt: base.addingTimeInterval(-100)
         )
         events = store.record(feed: changed, products: [product], existing: events)
         XCTAssertEqual(events.count, 2)
         XCTAssertEqual(events.first?.previousState, .review)
         XCTAssertEqual(events.first?.state, .live)
         XCTAssertTrue(events.first?.changedState == true)
+    }
+
+    func testHistoryUsesProviderSpecificSnapshotTimestamp() throws {
+        let suiteName = "NavoOpsTests.StoreHistory.ProviderDate.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            return XCTFail("Could not create isolated defaults suite")
+        }
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = StoreHistoryStore(defaults: defaults)
+        let product = ProductApp(
+            id: "sample",
+            name: "Sample",
+            repository: "sample",
+            platforms: [.android],
+            appleState: .development,
+            googleState: .development,
+            version: "1.0.0",
+            build: "1",
+            storeInfo: .init(androidPackageID: "com.kamilunavo.sample")
+        )
+        let providerDate = Date().addingTimeInterval(-120)
+        let mergedDate = Date()
+        let feed = StoreStatusFeed(
+            schemaVersion: 1,
+            generatedAt: mergedDate,
+            sourceRepository: "test",
+            appleAvailable: true,
+            googleAvailable: true,
+            apps: [
+                StoreAppSnapshot(
+                    provider: .google,
+                    appName: "Sample",
+                    externalID: "google",
+                    bundleOrPackageID: "com.kamilunavo.sample",
+                    version: "1.0.0",
+                    build: "1",
+                    rawState: "production:RELEASE_LIFECYCLE_STATE_IN_REVIEW",
+                    state: .review,
+                    updatedAt: nil,
+                    detail: nil
+                )
+            ],
+            appleGeneratedAt: mergedDate,
+            googleGeneratedAt: providerDate
+        )
+
+        let events = store.record(feed: feed, products: [product], existing: [])
+        XCTAssertEqual(events.count, 1)
+        XCTAssertEqual(events.first?.observedAt.timeIntervalSince1970 ?? 0, providerDate.timeIntervalSince1970, accuracy: 0.01)
     }
 
     @MainActor
@@ -119,7 +173,9 @@ final class IntelligenceTests: XCTestCase {
                     updatedAt: .now,
                     detail: nil
                 )
-            ]
+            ],
+            appleGeneratedAt: .now,
+            googleGeneratedAt: .now
         )
 
         let parity = model.insights(for: product).first { $0.kind == .parity }
@@ -163,7 +219,8 @@ final class IntelligenceTests: XCTestCase {
                     updatedAt: .now,
                     detail: nil
                 )
-            ]
+            ],
+            googleGeneratedAt: .now
         )
 
         let rejected = model.insights(for: product).first { $0.provider == .google && $0.severity == .critical }
