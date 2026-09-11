@@ -66,6 +66,16 @@ struct ReleaseCenterView: View {
             .refreshable { await model.refreshAll() }
         }
         .navigationTitle(L10n.t("Release Center", "Release Center"))
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                NavigationLink {
+                    StoreInventoryView()
+                } label: {
+                    Image(systemName: "storefront.fill")
+                }
+                .accessibilityLabel(L10n.t("Store Inventar", "Store Inventory"))
+            }
+        }
     }
 
     private var storeSourceSummary: some View {
@@ -73,6 +83,12 @@ struct ReleaseCenterView: View {
             sourcePill("Apple", available: model.appleLiveAvailable)
             sourcePill("Google Play", available: model.googleLiveAvailable)
             Spacer()
+            if !model.untrackedStoreApps.isEmpty {
+                Text("+\(model.untrackedStoreApps.count)")
+                    .font(.caption2.weight(.black))
+                    .foregroundStyle(NavoTheme.warning)
+                    .accessibilityLabel(L10n.t("\(model.untrackedStoreApps.count) ungetrackte Store-Apps", "\(model.untrackedStoreApps.count) untracked store apps"))
+            }
             if let date = model.storeGeneratedAt {
                 Text(date, style: .relative)
                     .font(.caption2)
