@@ -67,7 +67,14 @@ struct ReleaseCenterView: View {
         }
         .navigationTitle(L10n.t("Release Center", "Release Center"))
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                NavigationLink {
+                    ReviewCenterView()
+                } label: {
+                    Image(systemName: "exclamationmark.bubble.fill")
+                }
+                .accessibilityLabel(L10n.t("Review Center", "Review Center"))
+
                 NavigationLink {
                     StoreInventoryView()
                 } label: {
@@ -164,18 +171,27 @@ struct ReleaseCenterView: View {
 
     @ViewBuilder
     private func storeDetail(snapshot: StoreAppSnapshot) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: snapshot.provider == .apple ? "apple.logo" : "play.rectangle.fill")
-                .foregroundStyle(.secondary)
-            Text(snapshot.rawState)
-                .font(.caption.monospaced())
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-            Spacer()
-            if let updated = snapshot.updatedAt {
-                Text(updated, style: .relative)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                Image(systemName: snapshot.provider == .apple ? "apple.logo" : "play.rectangle.fill")
+                    .foregroundStyle(.secondary)
+                Text(snapshot.rawState)
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Spacer()
+                if let updated = snapshot.updatedAt {
+                    Text(updated, style: .relative)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+
+            if let reviewState = snapshot.review?.displayState {
+                Label(reviewState, systemImage: snapshot.review?.requiresAction == true ? "exclamationmark.bubble.fill" : "bubble.left.and.text.bubble.right")
+                    .font(.caption2.monospaced())
+                    .foregroundStyle(snapshot.review?.requiresAction == true ? NavoTheme.danger : .tertiary)
+                    .lineLimit(2)
             }
         }
     }
