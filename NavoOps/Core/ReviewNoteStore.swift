@@ -33,7 +33,7 @@ final class ReviewNoteStore {
     }
 
     static func tags(in message: String) -> [String] {
-        let pattern = #"(?i)\b(?:guideline\s*)?(\d+(?:\.\d+)+(?:\([a-z]\))?)\b"#
+        let pattern = #"(?i)\b(?:guideline\s*)?(\d+(?:\.\d+)+(?:\([a-z]\))?)(?=$|\s|[.,;:!?'\"\-])"#
         guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
         let range = NSRange(message.startIndex..<message.endIndex, in: message)
         let tags = regex.matches(in: message, range: range).compactMap { match -> String? in
