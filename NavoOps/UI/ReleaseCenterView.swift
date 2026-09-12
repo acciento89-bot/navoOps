@@ -40,12 +40,25 @@ struct ReleaseCenterView: View {
         }
     }
 
+    private var reviewIssueCount: Int {
+        model.storeFeed?.apps.filter {
+            $0.state == .rejected || $0.state == .attention || $0.review?.requiresAction == true
+        }.count ?? 0
+    }
+
+    private var activeReviewCount: Int {
+        model.storeFeed?.apps.filter {
+            $0.state == .review || $0.state == .processing
+        }.count ?? 0
+    }
+
     var body: some View {
         ZStack {
             NavoTheme.background.ignoresSafeArea()
             ScrollView {
                 VStack(spacing: 16) {
                     storeSourceSummary
+                    reviewCenterSummary
 
                     Picker(L10n.t("Filter", "Filter"), selection: $filter) {
                         ForEach(Filter.allCases, id: \.self) { item in
@@ -103,6 +116,38 @@ struct ReleaseCenterView: View {
             }
         }
         .navoCard(padding: 12)
+    }
+
+    private var reviewCenterSummary: some View {
+        NavigationLink {
+            ReviewCenterView()
+        } label: {
+            HStack(spacing: 13) {
+                Image(systemName: reviewIssueCount > 0 ? "exclamationmark.bubble.fill" : "bubble.left.and.text.bubble.right.fill")
+                    .font(.title3)
+                    .foregroundStyle(reviewIssueCount > 0 ? NavoTheme.danger : NavoTheme.accent)
+                    .frame(width: 42, height: 42)
+                    .background((reviewIssueCount > 0 ? NavoTheme.danger : NavoTheme.accent).opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(L10n.t("Review Center", "Review Center"))
+                        .font(.headline)
+                    Text(L10n.t(
+                        "\(reviewIssueCount) Probleme · \(activeReviewCount) in Prüfung",
+                        "\(reviewIssueCount) issues · \(activeReviewCount) in review"
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption.bold())
+                    .foregroundStyle(.tertiary)
+            }
+            .navoCard(padding: 13)
+        }
+        .buttonStyle(.plain)
     }
 
     private func sourcePill(_ name: String, available: Bool) -> some View {
