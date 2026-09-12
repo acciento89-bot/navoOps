@@ -190,7 +190,7 @@ struct ReleaseCenterView: View {
             if let reviewState = snapshot.review?.displayState {
                 Label(reviewState, systemImage: snapshot.review?.requiresAction == true ? "exclamationmark.bubble.fill" : "bubble.left.and.text.bubble.right")
                     .font(.caption2.monospaced())
-                    .foregroundStyle(snapshot.review?.requiresAction == true ? NavoTheme.danger : .tertiary)
+                    .foregroundStyle(snapshot.review?.requiresAction == true ? NavoTheme.danger : Color.secondary)
                     .lineLimit(2)
             }
         }
