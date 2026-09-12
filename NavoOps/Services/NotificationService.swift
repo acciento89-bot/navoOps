@@ -42,30 +42,57 @@ actor NotificationService {
         var current: [String: String] = [:]
 
         for app in feed.apps {
-            current[app.id] = app.state.rawValue
-            guard let old = previous[app.id], old != app.state.rawValue else { continue }
+            let fingerprint = storeFingerprint(app)
+            current[app.id] = fingerprint
+
+            guard let old = previous[app.id] else { continue }
+
+            // Migrate the old coarse state-only cache without firing a notification
+            // for every app on the first run of the richer review model.
+            if old == app.state.rawValue {
+                continue
+            }
+
+            guard old != fingerprint else { continue }
 
             switch app.state {
             case .rejected, .attention:
                 await send(
                     title: "NavoOps · \(app.provider.title)",
-                    body: L10n.t("\(app.appName) benötigt deine Aufmerksamkeit: \(app.detail ?? app.rawState)", "\(app.appName) needs attention: \(app.detail ?? app.rawState)"),
+                    body: L10n.t(
+                        "\(app.appName) benötigt deine Aufmerksamkeit: \(reviewDetail(app))",
+                        "\(app.appName) needs attention: \(reviewDetail(app))"
+                    ),
                     thread: "navoops-stores",
                     identifierPrefix: "store-attention"
                 )
             case .live:
+                let version = app.version.map { " v\($0)" } ?? ""
                 await send(
                     title: "NavoOps · \(app.provider.title)",
-                    body: L10n.t("\(app.appName) ist jetzt live.", "\(app.appName) is now live."),
+                    body: L10n.t("\(app.appName)\(version) ist jetzt live.", "\(app.appName)\(version) is now live."),
                     thread: "navoops-stores",
                     identifierPrefix: "store-live"
                 )
             case .review:
                 await send(
                     title: "NavoOps · \(app.provider.title)",
-                    body: L10n.t("\(app.appName) ist jetzt in Prüfung.", "\(app.appName) is now in review."),
+                    body: L10n.t(
+                        "\(app.appName): \(reviewDetail(app))",
+                        "\(app.appName): \(reviewDetail(app))"
+                    ),
                     thread: "navoops-stores",
                     identifierPrefix: "store-review"
+                )
+            case .processing:
+                await send(
+                    title: "NavoOps · \(app.provider.title)",
+                    body: L10n.t(
+                        "\(app.appName) wird verarbeitet: \(reviewDetail(app))",
+                        "\(app.appName) is processing: \(reviewDetail(app))"
+                    ),
+                    thread: "navoops-stores",
+                    identifierPrefix: "store-processing"
                 )
             default:
                 break
@@ -73,6 +100,18 @@ actor NotificationService {
         }
 
         saveStates(current, key: storeStateKey)
+    }
+
+    private func storeFingerprint(_ app: StoreAppSnapshot) -> String {
+        let reviewState = app.review?.displayState ?? ""
+        let itemStates = app.review?.itemStates.sorted().joined(separator: ",") ?? ""
+        return [app.state.rawValue, app.rawState, reviewState, itemStates].joined(separator: "|")
+    }
+
+    private func reviewDetail(_ app: StoreAppSnapshot) -> String {
+        if let detail = app.detail, !detail.isEmpty { return detail }
+        if let state = app.review?.displayState, !state.isEmpty { return state }
+        return app.rawState
     }
 
     private func send(title: String, body: String, thread: String, identifierPrefix: String) async {
