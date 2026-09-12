@@ -154,7 +154,6 @@ struct ReviewCenterView: View {
         .navoCard()
     }
 
-    @ViewBuilder
     private func stateLabel(_ snapshot: StoreAppSnapshot) -> some View {
         let title: String
         let color: Color
@@ -176,7 +175,7 @@ struct ReviewCenterView: View {
             color = .secondary
         }
 
-        Text(title)
+        return Text(title)
             .font(.caption2.weight(.bold))
             .foregroundStyle(color)
             .padding(.horizontal, 9)
@@ -324,7 +323,7 @@ struct ReviewIssueDetailView: View {
         .navigationTitle(L10n.t("Review-Details", "Review Details"))
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { loadLocalMessage() }
-        .onChange(of: localMessage) { _ in saved = false }
+        .onChange(of: localMessage) { _, _ in saved = false }
     }
 
     private func loadLocalMessage() {
