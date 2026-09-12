@@ -12,6 +12,63 @@ enum StoreProvider: String, Codable, CaseIterable, Hashable {
     }
 }
 
+struct StoreReviewSnapshot: Codable, Hashable {
+    enum ReasonAvailability: String, Codable, Hashable {
+        case api
+        case consoleOnly
+        case unavailable
+    }
+
+    let submissionID: String?
+    let submissionState: String?
+    let itemStates: [String]
+    let submittedAt: Date?
+    let track: String?
+    let lifecycleState: String?
+    let reason: String?
+    let reasonAvailability: ReasonAvailability
+    let consoleURL: String?
+
+    init(
+        submissionID: String? = nil,
+        submissionState: String? = nil,
+        itemStates: [String] = [],
+        submittedAt: Date? = nil,
+        track: String? = nil,
+        lifecycleState: String? = nil,
+        reason: String? = nil,
+        reasonAvailability: ReasonAvailability = .unavailable,
+        consoleURL: String? = nil
+    ) {
+        self.submissionID = submissionID
+        self.submissionState = submissionState
+        self.itemStates = itemStates
+        self.submittedAt = submittedAt
+        self.track = track
+        self.lifecycleState = lifecycleState
+        self.reason = reason
+        self.reasonAvailability = reasonAvailability
+        self.consoleURL = consoleURL
+    }
+
+    var requiresAction: Bool {
+        let states = ([submissionState, lifecycleState].compactMap { $0 } + itemStates).map { $0.uppercased() }
+        return states.contains { state in
+            state.contains("REJECT") ||
+            state.contains("NOT_APPROVED") ||
+            state.contains("UNRESOLVED") ||
+            state.contains("NOT_SENT_FOR_REVIEW") ||
+            state.contains("APPROVED_NOT_PUBLISHED")
+        }
+    }
+
+    var displayState: String? {
+        if let submissionState, !submissionState.isEmpty { return submissionState }
+        if let lifecycleState, !lifecycleState.isEmpty { return lifecycleState }
+        return itemStates.first
+    }
+}
+
 struct StoreStatusFeed: Codable, Hashable {
     let schemaVersion: Int
     let generatedAt: Date
@@ -86,6 +143,33 @@ struct StoreAppSnapshot: Identifiable, Codable, Hashable {
     let state: State
     let updatedAt: Date?
     let detail: String?
+    let review: StoreReviewSnapshot?
+
+    init(
+        provider: StoreProvider,
+        appName: String,
+        externalID: String?,
+        bundleOrPackageID: String?,
+        version: String?,
+        build: String?,
+        rawState: String,
+        state: State,
+        updatedAt: Date?,
+        detail: String?,
+        review: StoreReviewSnapshot? = nil
+    ) {
+        self.provider = provider
+        self.appName = appName
+        self.externalID = externalID
+        self.bundleOrPackageID = bundleOrPackageID
+        self.version = version
+        self.build = build
+        self.rawState = rawState
+        self.state = state
+        self.updatedAt = updatedAt
+        self.detail = detail
+        self.review = review
+    }
 }
 
 struct OperationsInboxItem: Identifiable, Hashable {
