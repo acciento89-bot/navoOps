@@ -6,6 +6,7 @@ struct AnalyticsService: Sendable {
         case invalidResponse(Int)
         case invalidPayload
         case allBridgesUnavailable
+        case refreshTimedOut
 
         var errorDescription: String? {
             switch self {
@@ -17,6 +18,8 @@ struct AnalyticsService: Sendable {
                 return L10n.t("Analytics-Daten konnten nicht gelesen werden.", "Analytics data could not be decoded.")
             case .allBridgesUnavailable:
                 return L10n.t("Noch keine Analytics-Bridge verfügbar.", "No analytics bridge is available yet.")
+            case .refreshTimedOut:
+                return L10n.t("Die Analytics-Bridges laufen noch. Bitte NavoOps geöffnet lassen und erneut versuchen.", "The analytics bridges are still running. Keep NavoOps open and try again.")
             }
         }
     }
@@ -72,18 +75,37 @@ struct AnalyticsService: Sendable {
         )
     }
 
-    func requestRefresh() async throws {
+    func requestRefreshAndWait(previousApple: Date?, previousGoogle: Date?) async throws -> AnalyticsFeed {
         guard let token = KeychainStore.githubToken, !token.isEmpty else { throw ServiceError.missingToken }
         async let apple = dispatchSafely(appleBridge, token: token)
         async let google = dispatchSafely(googleBridge, token: token)
         let (appleOK, googleOK) = await (apple, google)
         guard appleOK || googleOK else { throw ServiceError.allBridgesUnavailable }
+
+        for attempt in 0..<36 {
+            if attempt > 0 {
+                try await Task.sleep(nanoseconds: 5_000_000_000)
+            }
+            guard let feed = try? await fetchFeed() else { continue }
+            if BridgeRefreshPolicy.providersAdvanced(
+                appleGeneratedAt: feed.appleGeneratedAt,
+                googleGeneratedAt: feed.googleGeneratedAt,
+                previousApple: previousApple,
+                previousGoogle: previousGoogle,
+                waitForApple: appleOK,
+                waitForGoogle: googleOK
+            ) {
+                return feed
+            }
+        }
+        throw ServiceError.refreshTimedOut
     }
 
     private func fetch(_ bridge: Bridge, token: String) async throws -> AnalyticsFeed {
         var components = URLComponents(string: "https://api.github.com/repos/\(owner)/\(bridge.repository)/contents/\(bridge.feedPath)")!
         components.queryItems = [URLQueryItem(name: "ref", value: "main")]
-        var request = URLRequest(url: components.url!)
+        var request = URLRequest(url: components.url!, cachePolicy: .reloadIgnoringLocalCacheData)
+        request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
