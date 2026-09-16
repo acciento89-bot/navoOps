@@ -194,4 +194,45 @@ final class ModelsTests: XCTestCase {
         XCTAssertTrue(migrated.tags.contains("Education"))
         XCTAssertNotNil(migrated.storeInfo.privacyURL)
     }
+    func testBridgeRefreshPolicyWaitsForEverySuccessfullyDispatchedProvider() {
+        let baselineApple = Date(timeIntervalSince1970: 100)
+        let baselineGoogle = Date(timeIntervalSince1970: 200)
+
+        XCTAssertFalse(BridgeRefreshPolicy.providersAdvanced(
+            appleGeneratedAt: baselineApple,
+            googleGeneratedAt: baselineGoogle,
+            previousApple: baselineApple,
+            previousGoogle: baselineGoogle,
+            waitForApple: true,
+            waitForGoogle: true
+        ))
+
+        XCTAssertFalse(BridgeRefreshPolicy.providersAdvanced(
+            appleGeneratedAt: baselineApple.addingTimeInterval(1),
+            googleGeneratedAt: baselineGoogle,
+            previousApple: baselineApple,
+            previousGoogle: baselineGoogle,
+            waitForApple: true,
+            waitForGoogle: true
+        ))
+
+        XCTAssertTrue(BridgeRefreshPolicy.providersAdvanced(
+            appleGeneratedAt: baselineApple.addingTimeInterval(1),
+            googleGeneratedAt: baselineGoogle.addingTimeInterval(1),
+            previousApple: baselineApple,
+            previousGoogle: baselineGoogle,
+            waitForApple: true,
+            waitForGoogle: true
+        ))
+
+        XCTAssertTrue(BridgeRefreshPolicy.providersAdvanced(
+            appleGeneratedAt: baselineApple.addingTimeInterval(1),
+            googleGeneratedAt: baselineGoogle,
+            previousApple: baselineApple,
+            previousGoogle: baselineGoogle,
+            waitForApple: true,
+            waitForGoogle: false
+        ))
+    }
+
 }
