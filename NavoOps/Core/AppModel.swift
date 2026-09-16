@@ -196,9 +196,17 @@ final class AppModel: ObservableObject {
     }
 
     func refreshAll() async {
-        await refreshGitHub()
-        await refreshStores()
-        await refreshAnalytics()
+        async let githubRefresh: Void = refreshGitHub()
+        async let storeRefresh: Void = refreshStores()
+        async let analyticsRefresh: Void = refreshAnalytics()
+        _ = await (githubRefresh, storeRefresh, analyticsRefresh)
+    }
+
+    func forceRefreshAll() async {
+        async let githubRefresh: Void = refreshGitHub()
+        async let storeRefresh: Void = requestStoreBridgeRefresh()
+        async let analyticsRefresh: Void = requestAnalyticsBridgeRefresh()
+        _ = await (githubRefresh, storeRefresh, analyticsRefresh)
     }
 
     func refreshGitHub() async {
@@ -271,18 +279,40 @@ final class AppModel: ObservableObject {
     }
 
     func requestStoreBridgeRefresh() async {
+        guard !isRefreshingStores else { return }
+        isRefreshingStores = true
+        storeRefreshRequested = true
+        defer {
+            isRefreshingStores = false
+            storeRefreshRequested = false
+        }
+
         do {
-            try await storeStatus.requestBridgeRefresh()
-            storeRefreshRequested = true
+            let feed = try await storeStatus.requestBridgeRefreshAndWait(
+                previousApple: storeFeed?.appleGeneratedAt,
+                previousGoogle: storeFeed?.googleGeneratedAt
+            )
+            storeFeed = feed
+            storeHistory = storeHistoryStore.record(feed: feed, products: products, existing: storeHistory)
             storeErrorMessage = nil
+            await NotificationService.shared.processStoreFeed(feed)
         } catch {
             storeErrorMessage = error.localizedDescription
         }
     }
 
     func requestAnalyticsBridgeRefresh() async {
+        guard !isRefreshingAnalytics else { return }
+        isRefreshingAnalytics = true
+        defer { isRefreshingAnalytics = false }
+
         do {
-            try await analyticsService.requestRefresh()
+            let feed = try await analyticsService.requestRefreshAndWait(
+                previousApple: analyticsFeed?.appleGeneratedAt,
+                previousGoogle: analyticsFeed?.googleGeneratedAt
+            )
+            analyticsFeed = feed
+            analyticsHistory = analyticsHistoryStore.record(feed: feed, products: products, existing: analyticsHistory)
             analyticsErrorMessage = nil
         } catch {
             analyticsErrorMessage = error.localizedDescription
