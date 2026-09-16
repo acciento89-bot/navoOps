@@ -2,7 +2,7 @@
   "appName": "NavoOps",
   "subtitle": "Kamilunavo Operations",
   "bundleId": "com.kamilunavo.NavoOps",
-  "version": "1.2.0",
+  "version": "1.3.1",
   "primaryCategory": "BUSINESS",
   "distribution": "PRIVATE_CUSTOM_APP",
   "privacyUrl": "https://www.kamilunavo.com/privacy",
@@ -21,7 +21,7 @@
     "en": "NavoOps centralizes the operational status of Kamilunavo products in one internal app. Live state from App Store Connect and Google Play, release readiness, GitHub repositories, pull requests, issues and build health are combined in one place. Ops Intelligence detects rejections, store and version drift, missing mappings, stale data sources and release risks, then derives prioritized next actions and a transparent operations score. Store status and version changes are kept locally as history. Release checklists, history and internal notes remain on device."
   },
   "whatsNew": {
-    "de": "Neu in 1.2: Ops Intelligence mit Portfolio- und Produkt-Score, priorisierten Handlungsempfehlungen, Apple/Google-Paritätsprüfung, Versions-Drift, Datenquellen-Abdeckung und -Aktualität, Repository-Gesundheit sowie lokalem Store-Statusverlauf.",
-    "en": "New in 1.2: Ops Intelligence with portfolio and product scores, prioritized recommendations, Apple/Google parity checks, version drift, source coverage and freshness, repository health, and local store-status history."
+    "de": "Neu in 1.3.1: „Alles synchronisieren“ aktualisiert Apple- und Google-Bridges parallel, wartet auf tatsächlich neue Snapshots und lädt sie anschließend automatisch. Store- und Analytics-Abfragen umgehen veraltete lokale Cache-Antworten; der Fortschritt bleibt bis zum echten Abschluss sichtbar.",
+    "en": "New in 1.3.1: Sync Everything refreshes the Apple and Google bridges in parallel, waits for genuinely new snapshots, and loads them automatically. Store and analytics requests bypass stale local cache responses, and progress remains visible until completion."
   }
 }
