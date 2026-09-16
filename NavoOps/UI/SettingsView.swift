@@ -144,7 +144,7 @@ struct SettingsView: View {
             } label: {
                 Label(L10n.t("Bridge jetzt aktualisieren", "Refresh bridge now"), systemImage: "bolt.horizontal.circle.fill")
             }
-            .disabled(KeychainStore.githubToken == nil)
+            .disabled(model.isRefreshingStores || KeychainStore.githubToken == nil)
 
             if model.storeRefreshRequested {
                 Label(
@@ -219,7 +219,7 @@ struct SettingsView: View {
             } label: {
                 Label(L10n.t("Analytics-Bridges aktualisieren", "Refresh analytics bridges"), systemImage: "bolt.horizontal.circle.fill")
             }
-            .disabled(KeychainStore.githubToken == nil)
+            .disabled(model.isRefreshingAnalytics || KeychainStore.githubToken == nil)
 
             if let error = model.analyticsErrorMessage, !error.isEmpty {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
@@ -334,9 +334,13 @@ struct SettingsView: View {
     private var maintenanceSection: some View {
         Section(L10n.t("Wartung", "Maintenance")) {
             Button {
-                Task { await model.refreshAll() }
+                Task { await model.forceRefreshAll() }
             } label: {
-                Label(L10n.t("Alles synchronisieren", "Sync everything"), systemImage: "arrow.clockwise")
+                if model.isRefreshing || model.isRefreshingStores || model.isRefreshingAnalytics {
+                    ProgressView()
+                } else {
+                    Label(L10n.t("Alles synchronisieren", "Sync everything"), systemImage: "arrow.clockwise")
+                }
             }
             .disabled(model.isRefreshing || model.isRefreshingStores || model.isRefreshingAnalytics || KeychainStore.githubToken == nil)
 
