@@ -97,14 +97,11 @@ struct NavoLogoMark: View {
     var size: CGFloat = 48
 
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: size * 0.24, style: .continuous)
-                .fill(NavoTheme.brandGradient)
-            Text("K")
-                .font(.system(size: size * 0.54, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
-        }
-        .frame(width: size, height: size)
+        Image("NavoOpsBrand")
+            .resizable()
+            .scaledToFit()
+            .frame(width: size, height: size)
+            .clipShape(RoundedRectangle(cornerRadius: size * 0.24, style: .continuous))
         .shadow(color: NavoTheme.accent.opacity(0.35), radius: size * 0.22, y: size * 0.08)
         .accessibilityHidden(true)
     }

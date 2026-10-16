@@ -51,7 +51,7 @@ NavoOps is the private Kamilunavo operations control center for iPhone and iPad.
 - Google bridge uses GitHub OIDC -> Workload Identity Federation -> service account
 - German UI on German devices, English UI everywhere else
 - Privacy manifest with no tracking or collected-data declarations
-- Deterministic opaque Kamilunavo app icon generated during build
+- Original opaque NavoOps dashboard icon, validated and installed during build
 
 ## Analytics data policy
 

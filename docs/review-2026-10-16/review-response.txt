@@ -1,0 +1,7 @@
+Hello App Review,
+
+We have revised the app description and keywords to remove the third-party storefront references identified under Guideline 2.3.10. The metadata now focuses on the native iPhone/iPad portfolio, App Store Connect release status, repository/build monitoring and local operations workflow. Build 1.3.1 (7) also includes an original dashboard icon representing these actual features.
+
+The app's existing internal business distribution and optional authorized data integrations are unchanged. The interface can be reviewed without signing in; live source data requires the user's own authorized connection. No private store credentials are embedded in the app.
+
+Thank you for reviewing the corrected submission.

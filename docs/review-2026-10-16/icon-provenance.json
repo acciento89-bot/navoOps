@@ -1,0 +1,13 @@
+{
+  "tool": "built-in image_gen",
+  "sourceFile": "/Users/piotrkaminski/.codex/generated_images/01a11788-3eb6-7e32-963e-51b37d78e2ed/exec-be6d2aec-1452-4069-8002-4346c8cca4c5.png",
+  "prompt": "Use case: logo-brand. Asset type: original production iOS app icon for NavoOps, a native professional internal app portfolio, release and build monitoring control center. Create one finished square full-bleed opaque app icon, no device mockup, no exterior rounded corners or border (the operating system applies its mask). Design a premium, instantly readable dashboard symbol: a single softly sculpted ivory and dark-glass control panel with three large clearly differentiated release status tiles connected by a precise electric-blue workflow line; one small green completed-status badge integrated into the panel. This represents real portfolio monitoring, release readiness, repository and build health. Refined dimensional machined edges, clean silhouette, balanced composition, subtle contact shadows and controlled specular light. Deep midnight navy background with restrained azure/cyan illumination, consistent with a native dark blue operations dashboard. Large centered subject with approximately 15 percent safe inset, legible at 60 pixels. Professional product design, calm, precise and original. No text, letters, numerals, tiny UI text, charts suggesting fabricated revenue, coins, calculators, people, mascots, vehicles, rockets, AI sparkles, padlock, Apple/GitHub/Google logos, third-party branding, watermark, or generic letter monogram. Background fully opaque edge to edge.",
+  "visualReview": "Original opaque navy/azure dashboard showing code, build and delivered package linked in one workflow. Corresponds to portfolio/repository/build/release monitoring; no unrelated imagery, third-party logos or text. Mechanical resizing only for native icon assets.",
+  "sourceSha256": "b762e4e4ab889e8f5dc3c5f82bd984fa151fe628fe5613882b3cbbf0ba653516",
+  "nativeIconSha256": "aa4f2c1dde0b578582c0d26316f614de839f9667c8bcad74b1c2e89bc781ad19",
+  "nativeIconSize": [
+    1024,
+    1024
+  ],
+  "nativeIconMode": "RGB"
+}
